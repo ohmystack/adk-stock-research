@@ -6,7 +6,7 @@ import re
 import sys
 from pathlib import Path
 from .compatibility import ROOT, scan, import_skill
-from .runtime import environment
+from .runtime import environment, config
 
 def main():
     environment()
@@ -17,7 +17,7 @@ def main():
     r = sub.add_parser("run")
     r.add_argument("--mode",choices=["fixture","live"],default="fixture")
     r.add_argument("--ticker",default="DEMO")
-    r.add_argument("--discovery",choices=["eager","lazy"],default="eager")
+    r.add_argument("--discovery",choices=["eager","lazy"],help="Override discovery in config/workshop.yaml")
     r.add_argument("--max-calls",type=int,help="Lower the configured per-run call limit")
     r = sub.add_parser("fetch"); r.add_argument("--ticker",default="GOOGL"); r.add_argument("--refresh",action="store_true")
     r = sub.add_parser("lab"); r.add_argument("name",choices=["discovery","lifecycle","registry","artifacts","sizing"])
@@ -38,7 +38,7 @@ def main():
             from .data import load_bundle
             from .runtime import build_team
             bundle = load_bundle("fixture","DEMO")
-            team, toolsets, reports, model = build_team(bundle,"eager")
+            team, toolsets, reports, model = build_team(bundle,config().get("discovery", "eager"))
             result = {"check":"ADK team construction, accepted skills, deterministic indicators and calendar",
                 "model_called":False,"agents":[a.name for a in team.edges[0][1:]],"indicators":bundle["indicators"],"target_week":bundle["target_week"],"skills":reports}
             async def close():
@@ -53,7 +53,8 @@ def main():
             else:
                 from .runtime import run
                 bundle = load_bundle(args.mode,args.ticker)
-                result = {"output":str(asyncio.run(run(bundle,args.discovery,args.max_calls)))}
+                discovery = args.discovery or config().get("discovery", "eager")
+                result = {"output":str(asyncio.run(run(bundle,discovery,args.max_calls)))}
         print(json.dumps(result,ensure_ascii=False,indent=2,default=str))
     except Exception as exc:
         print(f"{type(exc).__name__}: {exc}",file=sys.stderr)

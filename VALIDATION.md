@@ -8,7 +8,8 @@
 | --- | --- |
 | 安装入口 | `bash scripts/setup.sh` 在本机复核通过；支持复用现有环境，自动寻找 Python 3.11+ |
 | 核心 Skill | 五个目录由真实 ADK 解析；工具、资源与能力检查通过 |
-| 自动测试 | **16 passed**；覆盖指标、节假日目标周、缺失证据、虚构引用、原生工具、三角色状态传递与导入 |
+| 自动测试 | **19 passed**；覆盖指标、节假日目标周、缺失证据、虚构引用、原生工具、三角色状态传递与导入 |
+| CLI／YAML | 未传 --discovery 时读取 YAML；显式参数优先；三种参数组合均验证通过 |
 | Discovery | 原生请求处理器验证 EAGER／LAZY 的目录与工具差异；无模型调用 |
 | 生命周期 | bounded 淘汰、ephemeral 下一轮失效、显式卸载、历史指令替换均由真实 ADK 工具验证 |
 | 原生脚本产物 | metrics-export 脚本生成文件，经 ArtifactService 保存、读回并核对内容 |
@@ -17,7 +18,7 @@
 | npx → ADK | 从安装目录导入，识别为 ADAPTABLE，原因是默认运行配置无脚本后端；同内容导入幂等且不自动激活 |
 | Registry | 原生 SkillRegistry 接口的本地关键词实现完成 search → load 验证 |
 | 实时数据 | 通过指定代理取得 GOOGL 的 126 根完整日线和 Google News RSS 标题；目标交易周正确计算 |
-| 文档资产 | 五张中文 SVG、合并后的 README 链接和 Markdown 结构检查 |
+| 文档资产 | 七张中文 SVG、合并后的 README 链接和 Markdown 结构检查 |
 
 测试中的脚本化模型只用于验证 Runner／Workflow、工具和状态行为，显式禁止 HTTP。以下两项另外使用了真实 Gemini。
 

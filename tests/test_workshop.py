@@ -77,6 +77,24 @@ def test_import_is_idempotent_and_never_activates():
     r=import_skill(ROOT/"vendor/skills/position-sizer")
     assert r["status"] == "ADAPTABLE" and not r["activated"] and r["already_present"]
 
+@pytest.mark.parametrize("flag,expected",[(None,"lazy"),("eager","eager"),("lazy","lazy")])
+def test_cli_discovery_uses_config_unless_overridden(monkeypatch,capsys,flag,expected):
+    import stock_research.cli as cli
+    import stock_research.runtime as runtime
+    received=[]
+    async def fake_run(bundle,discovery,max_calls):
+        received.append(discovery)
+        return "runs/test"
+    monkeypatch.setattr(cli,"environment",lambda:None)
+    monkeypatch.setattr(cli,"config",lambda:{"discovery":"lazy"})
+    monkeypatch.setattr(runtime,"run",fake_run)
+    argv=["workshop","run","--mode","fixture"]
+    if flag: argv.extend(["--discovery",flag])
+    monkeypatch.setattr("sys.argv",argv)
+    assert cli.main() == 0
+    assert received == [expected]
+    assert json.loads(capsys.readouterr().out)["output"] == "runs/test"
+
 def test_real_runner_with_scripted_model(tmp_path,monkeypatch):
     """Exercise actual ADK Runner, dynamic tools and state; zero network/token usage."""
     from google.adk.models.base_llm import BaseLlm
