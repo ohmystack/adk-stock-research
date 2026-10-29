@@ -8,7 +8,7 @@
 > 一份文档，两条阅读路径。讲师沿着「讲解」浏览机制与图示；观众沿着「动手」复制命令、检查结果。
 > 本项目已进行本地验证，完整状态见 [验证记录](VALIDATION.md)。Cloud Shell 验证尚未进行。
 
-[GitHub 仓库](https://github.com/ohmystack/adk-stock-research) · [讲师备忘](INSTRUCTOR.md) · [本地验证](VALIDATION.md) · [来源与许可](THIRD_PARTY_NOTICES.md)
+[GitHub 仓库](https://github.com/ohmystack/adk-stock-research) · [核心代码](#adk-wiring) · [操作与输出](#hands-on) · [讲师备忘](INSTRUCTOR.md) · [本地验证](VALIDATION.md) · [来源与许可](THIRD_PARTY_NOTICES.md)
 
 **今天的目标**：用同一组工具，换一套 Skill，让 Agent 改变研究方法；最后得到有来源、有反证、说明信心的股票分析报告。
 
@@ -21,6 +21,8 @@
 | 90–100 分钟 | 固定版本、整理产物 | 报告、修改说明、演示材料 |
 
 成果展示另计。进度不同的小组可跳过选做内容，不要求把所有挑战做完。
+
+**不运行也能跟读**：重要命令后附有结果节选，主要取自 2026-10-29 的本地验证。JSON 只保留与讲解相关的字段；机器上的绝对路径统一简写为 `runs/...`。股票、时间、模型文本与耗时随实际运行变化，历史结果不代表当前行情。
 
 ---
 
@@ -97,6 +99,122 @@ Skill 也可以声明需要的额外工具。宿主先注册真实工具，Skill
 
 业务流程：取证据 → 算指标 → 两份分析 → 审查反证 → 建议与信心 → 校验与保存。原始数据、分析规则与执行能力分开，才能解释改动为什么影响结果。
 
+<a id="adk-wiring"></a>
+
+### 核心代码：ADK 怎样把这些组件接起来？
+
+下面按执行顺序摘出项目的核心接线，省略日志、预算与错误处理；注释用于讲解，**片段不需要逐段执行**。观众动手仍使用后面的命令入口。完整实现见 [兼容性检查与加载](stock_research/compatibility.py)、[Agent 与 Workflow](stock_research/runtime.py)。
+
+**① Skill 声明方法，以及它需要哪些工具。**
+
+[technical-trend/SKILL.md](skills/technical-trend/SKILL.md) 的关键内容：
+
+```markdown
+---
+name: technical-trend
+description: Analyze stock price trend using deterministic technical indicators.
+metadata:
+  adk_additional_tools: ["calculate_indicators", "read_evidence"]
+---
+
+先调用 calculate_indicators。读取 references/method.md。
+根据指标解释趋势；只引用工具数值和 P1。给出反证和失效条件。
+```
+
+名称和描述帮助模型选择；正文告诉它怎样做；`adk_additional_tools` 引用的是宿主必须提供的工具名称，不是安装指令。
+
+**② 检查目录，再用 ADK 原生 API 解析 Skill。**
+
+```python
+from google.adk.skills import load_skill_from_dir
+
+reports = scan()  # 本项目的零 token 能力检查
+skills = {
+    r["skill"]: load_skill_from_dir(ROOT / "skills" / r["skill"])
+    for r in reports
+    if r["status"] == "SUPPORTED"
+}
+```
+
+这时得到的是 Python 中的 Skill 对象，模型还没有自动读过所有正文。`load_skill_from_dir` 负责解析目录；后续模型调用的 `load_skill` 工具负责把相应方法交给模型。两步不要混为一谈。
+
+**③ SkillToolset 配置发现方式、生命周期和可绑定的真实工具。**
+
+下面位于角色构造循环中；`names` 来自 [角色配置](config/workshop.yaml)，例如技术分析师分配到两个 Skill。
+
+```python
+from google.adk.tools.skill_toolset import (
+    SkillToolset, SkillDiscoveryMode,
+    SkillLifecycleConfig, SkillLifecycleMode,
+)
+
+toolset = SkillToolset(
+    skills=[skills[n] for n in names],
+    additional_tools=[read_evidence, calculate_indicators],
+    discovery_mode=SkillDiscoveryMode(discovery),  # eager 或 lazy
+    lifecycle_config=SkillLifecycleConfig(
+        default_mode=SkillLifecycleMode.BOUNDED,
+        max_active_skills=2,
+    ),
+)
+```
+
+`additional_tools` 放的是实际 Python 函数。Skill 激活后，ADK 按其元数据把匹配工具加入模型请求。主任务的上限是 2；后面的生命周期小实验会专门改成 1，方便看到淘汰。
+
+本项目启动时还会设置 `ADK_ENABLE_SKILL_LIFECYCLE=1`；仅有配置对象，不代表实验能力已开启。
+
+**④ Agent 配置职责、SkillToolset 和结构化结果。**
+
+```python
+from google.adk.agents import LlmAgent
+
+agents.append(LlmAgent(
+    name=role,                  # technical、catalyst、review
+    model=model,                # gemini-3.8-flash
+    instruction=instruction,    # 角色要求、先加载 Skill、证据规则
+    tools=[toolset],
+    output_schema=Decision if role == "review" else Analysis,
+    output_key=role,            # 将结果写入相应 state 键
+))
+```
+
+`instruction` 约束角色的任务；具体分析方法放在 Skill 中。`output_schema` 规定结果结构，不能保证事实正确。`output_key` 让后续角色读取前一位的结果。
+
+风险审查员的指令里包含以下模板，ADK 会用 state 中的两份分析替换占位符：
+
+```python
+instruction += (
+    "Technical analysis: {technical}\n"
+    "Event analysis: {catalyst}\n"
+    "Use both outputs, audit counterarguments and sources."
+)
+```
+
+**⑤ Workflow 固定先后，Runner 执行一次任务。**
+
+```python
+from google.adk import Workflow
+from google.adk.runners import Runner
+from google.adk.artifacts import InMemoryArtifactService
+
+team = Workflow(
+    name="research_team",
+    edges=[("START", *agents)],
+    timeout=180,
+)
+
+runner = Runner(
+    node=team,
+    app_name="workshop",
+    session_service=sessions,
+    artifact_service=InMemoryArtifactService(),
+)
+```
+
+`agents` 按 `technical → catalyst → review` 顺序构造，因此这里是一条顺序流程：前两位各自分析，最后一位综合。接着 `runner.run_async(...)` 接收用户消息并持续返回事件；项目从事件中记录工具调用、响应和 token 用量。
+
+**读代码时抓住这条线**：目录解析 → 合格 Skill → SkillToolset → 角色 Agent → Workflow → Runner。观众通常只需改 Skill 正文／参考资料和角色配置，核心接线保持不变。
+
 ### 4 月以后，这次重点看什么？
 
 | 能力 | 机制 | 本项目入口 |
@@ -114,6 +232,8 @@ Skills 仍属实验能力。本项目启动时显式开启生命周期开关，�
 
 ---
 
+<a id="hands-on"></a>
+
 ## 02 · 动手：准备环境
 
 以下命令都在仓库根目录 `adk-stock-research` 运行。需要 Python 3.11+。主线不需要 Node；npx 挑战另需 Node 22.20+。
@@ -130,6 +250,15 @@ bash scripts/setup.sh
 
 这会下载整个项目，包括文档、图示、代码和 Skill。**Cloud Shell 操作路径尚未彩排**，本轮只验证本地。
 
+安装成功时，本地日志的关键部分如下；已装依赖时还会出现 `Requirement already satisfied`，不必逐行对照版本下载进度。
+
+```text
+Successfully built adk-skills-workshop
+Successfully installed adk-skills-workshop-0.1.0
+```
+
+安装脚本最后自动运行 `doctor`。第一次还没配置 Key 时，`gemini_key_present` 为 `false` 是正常的，下一步配置后再检查。
+
 ### 已有项目：拉取更新
 
 进入之前克隆的目录，先确认本组改动，再拉取仓库更新：
@@ -143,31 +272,15 @@ bash scripts/setup.sh
 
 如果有本组修改或出现冲突，先保存到小组分支再处理；不要用重置命令丢弃实验成果。`git pull` 用于已有仓库，首次下载使用上面的 `git clone`。
 
-### 本地调试：先设置代理
+### Python 版本检查
 
-在本地电脑首次获取代码前，设置本地代理；Cloud Shell 跳过这一步：
-
-```bash
-export HTTPS_PROXY=http://127.0.0.1:1080
-export HTTP_PROXY=http://127.0.0.1:1080
-git -c http.proxy=http://127.0.0.1:1080 clone https://github.com/ohmystack/adk-stock-research.git
-cd adk-stock-research
-bash scripts/setup.sh
-```
-
-Cloud Shell 不使用本机的 `127.0.0.1:1080`。项目已有 `.venv` 时安装脚本会复用；没有 Python 3.11+ 时，先安装合适版本，也可用 `WORKSHOP_PYTHON=/path/to/python3.12 bash scripts/setup.sh` 明确指定解释器。
+项目已有 `.venv` 时安装脚本会复用；没有 Python 3.11+ 时，先安装合适版本，也可用 `WORKSHOP_PYTHON=/path/to/python3.12 bash scripts/setup.sh` 明确指定解释器。
 
 ### 配置 Google AI Studio Key
 
 在 [Google AI Studio](https://aistudio.google.com/apikey) 创建 Key。每组由一人保管；Key 不进入聊天、Git 或展示文件。
 
-本地运行：
-
-```bash
-.venv/bin/python scripts/configure.py --local
-```
-
-Cloud Shell 运行：
+在本地或 Cloud Shell 中运行：
 
 ```bash
 .venv/bin/python scripts/configure.py
@@ -175,12 +288,57 @@ Cloud Shell 运行：
 
 按提示输入 Key，屏幕不回显。脚本保存到权限为 600 的 `.env`，默认使用 Gemini Developer API 的 `gemini-3.8-flash`。已有 `.env` 可直接复用，无需重复配置。
 
+交互提示如下，隐藏输入的位置不会显示 Key：
+
+```text
+Gemini API key (hidden):
+Saved private .env. Run doctor to check presence; the key will not be displayed.
+```
+
 ```bash
 .venv/bin/python -m stock_research.cli doctor
 .venv/bin/python -m stock_research.cli offline-check
 ```
 
 **检查点**：`gemini_key_present: true`；五个核心 Skill 均为 `SUPPORTED`；离线检查显示三个角色与目标交易周。`offline-check` 不调用 Gemini，也不生成虚构的模型报告。
+
+**`doctor` 结果节选**：下面只保留两条 Skill，完整输出还包含另外三条、哈希和检查理由。
+
+```json
+{
+  "python": "3.12.8",
+  "adk": "2.13.0",
+  "gemini_key_present": true,
+  "skills": [
+    {
+      "skill": "data-quality",
+      "status": "SUPPORTED"
+    },
+    {
+      "skill": "decision-report",
+      "status": "SUPPORTED"
+    }
+  ]
+}
+```
+
+**`offline-check` 结果节选**：尚未调用模型，但 Agent 构造、确定性指标和目标交易周已能验证。
+
+```json
+{
+  "model_called": false,
+  "agents": [
+    "technical",
+    "catalyst",
+    "review"
+  ],
+  "target_week": {
+    "start": "2026-09-28",
+    "end": "2026-10-02",
+    "sessions": 5
+  }
+}
+```
 
 ### 初始化检查做了什么？
 
@@ -207,6 +365,44 @@ Cloud Shell 运行：
 
 这条命令**真实调用 Gemini**；`fixture` 指输入数据固定，不是模型响应回放。证券 `DEMO` 是虚构的，最终建议强制为 HOLD／观望、未知趋势、低信心。
 
+**命令结束时的输出**（绝对路径已简写）：
+
+```json
+{
+  "output": "runs/20261029T092441-dfded3"
+}
+```
+
+这个路径就是本次实验的结果目录。打开其中的 `decision.json`，本地实测的重点字段如下：
+
+```json
+{
+  "ticker": "DEMO",
+  "data_mode": "fixture",
+  "analysis_status": "insufficient_data",
+  "trend": "unknown",
+  "action": "HOLD",
+  "confidence_level": "low",
+  "evidence_ids": [
+    "P1",
+    "N1"
+  ]
+}
+```
+
+同次运行的 `usage.json` 节选：
+
+```json
+{
+  "model_responses": 9,
+  "tool_calls": 17,
+  "seconds": 32.37,
+  "estimated_usd": 0.019894
+}
+```
+
+这里的费用按付费标价估算，实际免费层可能为零。合成数据下的 HOLD 是数据质量约束，不是一次真实股票判断。
+
 成功后，终端返回 `runs/<运行编号>`。打开这个目录：
 
 | 文件 | 用来回答什么问题 |
@@ -219,6 +415,54 @@ Cloud Shell 运行：
 | `usage.json` | 本次 token、模型响应次数、耗时与估算费用？ |
 
 **检查点**：找到三个角色的 `load_skill` 调用；找到行情／新闻工具响应。模型跳过必要 Skill 时，程序拒绝把它标成一次成功实验。
+
+**工具调用长什么样？**下面节选自一次本地实测的 `trace.json`；技术分析师先请求加载两个方法：
+
+```json
+{
+  "author": "technical",
+  "calls": [
+    {
+      "name": "load_skill",
+      "args": {
+        "skill_name": "data-quality"
+      }
+    },
+    {
+      "name": "load_skill",
+      "args": {
+        "skill_name": "technical-trend"
+      }
+    }
+  ]
+}
+```
+
+再看同次运行的 `requests.json`，技术分析师激活 Skill 前后，请求中的工具集合发生了变化：
+
+```text
+激活前：set_model_response, load_skill, load_skill_resource, unload_skill
+激活后：以上工具 + read_evidence, calculate_indicators
+```
+
+`set_model_response` 是 ADK 为结构化结果提供的内部响应工具。新出现的两个业务工具，来自 Skill 元数据与 `additional_tools` 的匹配；不需要让所有 Agent 一开始就看到所有工具。
+
+**Skill 怎样拿到本次任务信息？**[data-quality/SKILL.md](skills/data-quality/SKILL.md) 还声明了加载时的 state 注入：
+
+```yaml
+metadata:
+  adk_inject_state: true
+  adk_additional_tools: ["read_evidence"]
+```
+
+正文中的 `当前证券：{ticker}；证据截至：{as_of}`，在这次 `load_skill` 的响应里变成：
+
+```text
+当前证券：GOOGL；证据截至：2026-10-29T05:21:11.520714-04:00。
+这是加载时的 state 注入快照。
+```
+
+这与风险审查员读取 `{technical}`／`{catalyst}` 的 Agent 指令模板分别发生在不同位置：一个在 Skill 加载时，一个在构造模型指令时。
 
 ### 切换真实股票
 
@@ -233,6 +477,48 @@ Cloud Shell 运行：
 
 当前新闻路径只读标题和发布时间，未核验全文，因此最多中信心；缺少新闻明确降级，行情过期则拒绝标成 live。来源站点不可用时不会静默换成合成数据。
 
+**真实数据获取结果节选**（2026-10-29 本地记录，字段与 `fetch` 的输出一致）：
+
+```json
+{
+  "ticker": "GOOGL",
+  "as_of": "2026-10-29T05:21:11.520714-04:00",
+  "mode": "live",
+  "indicators": {
+    "last_close": 324.890015,
+    "sma20": 339.8105,
+    "sma60": 342.837212,
+    "last_bar": "2026-10-28"
+  },
+  "target_week": {
+    "start": "2026-11-02",
+    "end": "2026-11-06",
+    "sessions": 5
+  }
+}
+```
+
+**随后三 Agent 完成的结果节选**：
+
+```json
+{
+  "ticker": "GOOGL",
+  "data_mode": "live",
+  "analysis_status": "degraded",
+  "trend": "down",
+  "action": "SELL",
+  "confidence_level": "medium",
+  "evidence_ids": [
+    "P1",
+    "N1",
+    "N2",
+    "N5"
+  ]
+}
+```
+
+这个历史样例展示“卖出＋中信心”的结果形态，不是保证再次运行会得出相同方向。`degraded` 表示证据降级：当时事件侧只读取标题，报告仍须保留反证、缺失信息和失效条件。
+
 真实行情与新闻不提交到仓库，使用时遵守数据提供方条款。建议每组先研究一只美股；不要直接把港股／A 股代码塞进美股日历流程。
 
 ---
@@ -244,6 +530,30 @@ Cloud Shell 运行：
 ```
 
 打开 `runs/lab-discovery.json`：
+
+**结果节选**（只展示工具列表，省略很长的系统指令）：
+
+```json
+{
+  "modes": {
+    "eager": {
+      "tools": [
+        "load_skill",
+        "load_skill_resource",
+        "unload_skill"
+      ]
+    },
+    "lazy": {
+      "tools": [
+        "list_skills",
+        "load_skill",
+        "load_skill_resource",
+        "unload_skill"
+      ]
+    }
+  }
+}
+```
 
 - **EAGER**：system instruction 里有名称与描述；工具列表中没有 list_skills。
 - **LAZY**：提供 list_skills，Agent 需要调用它获得本地目录。
@@ -282,6 +592,31 @@ Cloud Shell 运行：
 | 显式卸载 report | 空 | 相关动态工具消失 |
 
 `pruned_history` 展示已经卸载的 Skill 指令被替换成短通知。卸载影响下一次请求，不删除已保存事实、报告或 Artifact。
+
+**结果节选**：保留原始步骤名和激活列表，省略每步重复的工具声明。
+
+```json
+{
+  "steps": [
+    {"step": "load risk", "active": ["lab-risk"]},
+    {"step": "load report; bounded cap evicts risk", "active": ["lab-report"]},
+    {"step": "ephemeral loaded in turn 1", "active": ["lab-report", "lab-glossary"]},
+    {"step": "turn 2; ephemeral expired", "active": ["lab-report"]},
+    {"step": "explicit unload", "active": []}
+  ],
+  "pruned_history": {"skill_name": "lab-risk", "status": "unloaded"}
+}
+```
+
+对照 `stock_research/labs.py` 中的配置，就能解释为什么会出现这些状态：
+
+```python
+SkillLifecycleConfig(
+    default_mode=SkillLifecycleMode.BOUNDED,
+    max_active_skills=1,
+    skill_overrides={"lab-glossary": SkillLifecycleMode.EPHEMERAL},
+)
+```
 
 **三件容易混淆的事**：
 
@@ -343,6 +678,20 @@ Cloud Shell 运行：
 
 包内原件已存在，同一内容重复导入会返回 `already_present: true` 和检查结果，不重复复制。默认运行配置没有通用脚本执行器，因此原件检查为 ADAPTABLE。导入只放进 vendor 隔离目录，不自动激活。
 
+**导入结果节选**：安装成功与运行能力匹配是两件事。
+
+```json
+{
+  "skill": "position-sizer",
+  "status": "ADAPTABLE",
+  "reasons": [
+    "scripts present; default runtime has no script executor"
+  ],
+  "activated": false,
+  "already_present": true
+}
+```
+
 已适配版本位于 `extensions/position-sizer-adk`：脚本和参考资料保留，只把宿主操作说明改为 ADK 的工具步骤。
 
 ```bash
@@ -350,6 +699,19 @@ Cloud Shell 运行：
 ```
 
 **检查点**：合成账户 10,000，单笔风险 1%，入场 100，止损 95 → 20 股，风险 100。查看原生 `run_skill_script` 与写入 ArtifactService 后读回的 JSON／Markdown。
+
+**结果文件读回并解析后的字段节选**：
+
+```json
+{
+  "final_recommended_shares": 20,
+  "final_position_value": 2000.0,
+  "final_risk_dollars": 100.0,
+  "final_risk_pct": 1.0
+}
+```
+
+重点是可核算：风险预算为 100，每股风险为 5，因此得到 20 股。这个 Skill 只负责仓位计算，不提供股价趋势结论。
 
 ### npx 安装不是运行时接线
 
@@ -361,6 +723,18 @@ npx --yes skills@1.7.4 add ./vendor/skills/position-sizer --agent universal --co
 ```
 
 安装器把文件放入 `.agents/skills/`，ADK 仍需要检查、显式加载和实际执行后端。仓库下载、ZIP 解包、手动复制也遵循同一条路径。同名、同内容的重复导入返回检查结果；同名但内容不同则拒绝覆盖，要求另选版本目录。
+
+**npx 本地安装输出节选**（省略交互界面的边框和进度）：
+
+```text
+Found 1 skill
+Skill: position-sizer
+./.agents/skills/position-sizer
+copy → Universal
+Installation complete
+```
+
+看到这个目录，只证明文件已安装；后续仍要经过导入检查和 ADK 接线。
 
 `Read`、`WebSearch`、`Bash` 等宿主名称不会自动创建 ADK 工具。编程助手的开发 Skill、插件配置和 ADK 运行时 Skill 也不是同一种东西。
 
@@ -376,6 +750,42 @@ npx --yes skills@1.7.4 add ./vendor/skills/position-sizer --agent universal --co
 
 查看 `runs/lab-artifacts.json` 的 `saved.metrics.json`：它来自脚本执行后的 ArtifactService 读回，并非自己写一个文件后假装 Artifact。进程结束前导出到 runs，因此能查看与分享。
 
+**脚本执行结果节选**：
+
+```json
+{
+  "execution_result": {
+    "skill_name": "metrics-export",
+    "file_path": "scripts/export.py",
+    "status": "success",
+    "saved_artifacts": [
+      "metrics.json"
+    ]
+  }
+}
+```
+
+从 ArtifactService 读回 `metrics.json`，解析后的内容是：
+
+```json
+{
+  "example": true,
+  "risk_budget": 100,
+  "stop_distance": 5,
+  "shares": 20
+}
+```
+
+关键接线是显式提供执行器和保存开关；Runner／调用上下文还需提供 ArtifactService：
+
+```python
+SkillToolset(
+    skills=[script_skill],
+    code_executor=UnsafeLocalCodeExecutor(),
+    save_output_artifacts=True,
+)
+```
+
 此实验仅启用包内审阅过的短脚本，使用 UnsafeLocalCodeExecutor；它不是沙箱。默认股票 Agent 不提供该执行器，不会运行导入目录中的任意脚本。
 
 当前原生自动保存开关适用于 code-executor 路径，不直接适用于 Environment；框架保存 report.md 与 ADK 自动收集脚本产物要分开理解。
@@ -387,6 +797,21 @@ npx --yes skills@1.7.4 add ./vendor/skills/position-sizer --agent universal --co
 ```
 
 这是实现 ADK SkillRegistry 接口的本地关键词索引：search 返回小型元数据候选集，load 再取正文。它没有向量检索，也不声称是托管服务。
+
+**结果节选**：查询 `risk` 后先看到候选名称，再加载对应 Skill；正文在此省略。
+
+```json
+{
+  "search": [
+    {
+      "name": "risk-review"
+    }
+  ],
+  "loaded": {
+    "skill_name": "risk-review"
+  }
+}
+```
 
 Google Cloud Skill Registry 需要额外的 API、项目、区域与 IAM，留作后续扩展；本活动不把它设成完成主任务的前提。
 
