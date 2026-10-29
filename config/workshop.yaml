@@ -1,0 +1,9 @@
+model: gemini-3.8-flash
+discovery: eager
+max_model_calls: 16
+max_runs: 20
+max_estimated_usd: 4.0
+roles:
+  technical: [data-quality, technical-trend]
+  catalyst: [news-catalyst]
+  review: [risk-review, decision-report]

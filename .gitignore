@@ -1,0 +1,47 @@
+# Credentials: only the empty template belongs in Git.
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+*credentials*.json
+*service-account*.json
+*service_account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local Python environments and generated files.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+
+# Personal executions, downloaded market data and reference execution snapshots.
+runs/
+data/cache/
+docs/examples/
+*.log
+*.log.*
+*.tmp
+*.bak
+*.zip
+*.tar.gz
+
+# Skill installer output and local editor / OS state.
+.agents/skills/
+.claude/
+.gemini/
+skills-lock.json
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "core": {
+    "technical-trend": "2985e08182e614c2649d3800b30ed44409babe84af2dbce4ce72f9e9cd6e95d7",
+    "data-quality": "fd49cd98eeeb04f388d11bc4e1e16185887554cd92ef1142f282ecb73d832dcc",
+    "decision-report": "609fcedb1d0aefa148336cc68b4d8acab61f5ea55c3ab320129872b0125264e1",
+    "risk-review": "d6f16c008f742deebabb56dc2e44fb746a29b15ad1a522c8461b6848a83ea732",
+    "news-catalyst": "4e30c4ebf4384cb405f95bbfaa15b15199807a76d915683d90b2e093f401ae21"
+  },
+  "upstream": [
+    {
+      "repo": "tradermonty/claude-trading-skills",
+      "commit": "c9b84196a44a56a553293114fdae1f30bdd08c58",
+      "skill": "position-sizer",
+      "sha256": "0e900e7583d9ef277f0d19c72c432429ba265d3552992e17d4b45029b5ad8344",
+      "license": "MIT"
+    }
+  ],
+  "adapters": {
+    "position-sizer-adk": "d784a3b570f7ea9d096c3dbfc5c9e7cad4f09cbe965e27d4b079b37f21b20700"
+  },
+  "note": "Core methods may be edited; each run records fresh hashes. Upstream snapshot is pinned."
+}
