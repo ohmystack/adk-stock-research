@@ -1,74 +1,92 @@
 # 讲师备忘 · 100 分钟
 
-主屏使用 [README.md](README.md)，现场不要从实现文件开始讲。中文图示覆盖开场、ADK 入门、Skill 渐进披露、团队职责、EAGER／LAZY、State 数据流与生命周期。
+主屏使用 [README.md](README.md)。正文顺序为 ADK／Skill → 环境 → 核心代码与预检 → CLI／Web 两种运行方式 → 首次研究与 Trace → Discovery／生命周期 → 修改方法与扩展。详细接线和检查规则保留在[实现参考](docs/implementation.md)。
 
 ## 会前
 
-- 在固定版本完成一次 `doctor`、真实 Gemini fixture、live 和 `lab lifecycle`。
-- 查看 [VALIDATION.md](VALIDATION.md)，区别本地已测与 Cloud Shell 未测。
+- 完成 `doctor`、`offline-check`，并通过 Web UI 运行一次 fixture 与 live。
+- 启动 `.venv/bin/adk web web_agents --port 8000 --no-reload --no_use_local_storage`，选择 research。
+- 保存成功运行的报告与 Trace 截图作为回放备份；重启 Web 服务后，内存中的 Session／Trace 不保留。
+- 查看 [VALIDATION.md](VALIDATION.md)，区分本地已测与云端未测。
 - 每组一套 Key／项目配额；不是每人一把 Key 就有五份配额。
-- 为五人组明确运行、方法、数据、验证、展示分工。
-- 不在投影中打开 `.env`；展示 runs 中的报告与必要证据。
-- 保留一个已成功的 fixture 结果作为明确标注的回放备份。
+- 不在投影中打开 `.env`，只展示报告与必要证据。
 
-## 35 分钟讲解节奏
+## 时间安排
 
-| 分钟 | 展示内容 | 核心提问 |
+| 时间 | 内容 | 产物 |
 | --- | --- | --- |
-| 0–4 | 一份完整报告、证据和反证 | 好报告为什么不只有“买入”？ |
-| 4–10 | ADK 与 Skill 入门图、团队架构 | 模型、框架、方法与工具分别负责什么？ |
-| 10–16 | EAGER／LAZY 对照表与 discovery 实验 | 目录何时进入上下文？为何本项目默认 EAGER？ |
-| 16–25 | lifecycle 图与真实实验输出 | 一轮有多少模型调用？卸载后什么还在？ |
-| 25–31 | State 数据流图、关键 Prompt、脚本 Artifact | Workflow 的顺序怎样与结果读写配合？ |
-| 31–35 | 改 Skill 的位置、组预算和失败路径 | 只换方法能改变什么，何时需要新 Tool？ |
+| 00–8 分钟 | ADK、工具、Skill 与团队结构 | 理解方法与执行能力的区别 |
+| 8–12 分钟 | 环境安装与 Key 配置 | 确认实验前提，不在此启动 UI |
+| 12–25 分钟 | 核心代码、doctor／scan／offline-check、State 与 YAML | 解释检查、加载、数据流与复用方法 |
+| 25–35 分钟 | 两种运行方式、首份报告、原生 Trace | 模型请求、调用过程、耗时 |
+| 35–40 分钟 | EAGER／LAZY、生命周期 | 机制对照 |
+| 40–55 分钟 | 环境与首次研究 | 每组一份报告 |
+| 55–65 分钟 | Discovery、生命周期实验 | 状态变化记录 |
+| 65–90 分钟 | 修改 Skill、固定输入对照 | 改动与执行证据 |
+| 90–100 分钟 | 整理产物 | 报告、差异、关键截图 |
 
-2026 年 4 月前已有基本加载与脚本，9 月的发现／生命周期和 10 月的产物／追踪是本次重点。不要把基础概念都称作新特性。
+## 代码讲解重点
 
-讲解自带功能时，重点区分 doctor 的环境诊断、offline-check 的无模型构造检查和真实 run 的模型行为验证；它们的职责、源码入口和局限在 README 中已有表格。配置由本项目读取，不是 ADK 自动识别的标准 YAML。
+- 先说明 ADK 原生解析器负责什么，再展示项目在其上实现的能力画像、候选过滤和业务接线检查。
+- doctor 是诊断报告，零退出码不代表所有方法可用；Key 存在不等于 API 验证。
+- scan 逐个检查候选并保留理由，accepted_skills 才真正过滤加载；必需方法缺失时拒绝运行。
+- offline-check 真正构造 ADK 团队但不调用模型，将数据／接线错误与模型执行错误分开。
+- 结合 README 中的核心摘录、State 图与配置表讲复用入口，不到实验结尾再讲代码。
 
-## 必演示命令
+## UI 演示顺序
 
-在项目根目录，已配置 Key 后：
+每次研究点击 **NEW SESSION**，隔离历史与 Skill 激活记录。已配置 Key 后，在 research 中发送：
 
-```bash
-.venv/bin/python -m stock_research.cli doctor
-.venv/bin/python -m stock_research.cli lab discovery
-.venv/bin/python -m stock_research.cli lab lifecycle
-.venv/bin/python -m stock_research.cli lab artifacts
-.venv/bin/python -m stock_research.cli lab sizing
-.venv/bin/python -m stock_research.cli run --mode fixture
+```text
+研究 mode=fixture ticker=DEMO discovery=eager，给出证据、反证、失效条件和信心。
 ```
 
-前五项不调用模型；最后一项真实调用 Gemini。原生脚本工具与 Artifact 保存已能在没有模型的情况下验证，不必为了讲机制反复烧 token。
+1. 在最终 Markdown 报告中确认 fixture、HOLD、unknown、low；不要将前一条 review 的原始 JSON 误当成程序校验后的交付报告。
+2. 切到 Traces，按 technical → catalyst → review 查看角色时序、模型和工具 span，观察总耗时及各段耗时。
+3. 选择 technical 的模型 span，点击左侧 Event ID，再选 Request 输入箭头。折叠 system_instruction，展开 user_messages 中的 load_skill 返回，查看方法正文与 ticker／as_of 注入。
+4. 对照该目录的 requests.json，查看加载前后工具声明。ADK 的 span Attributes 也包含工具定义与用量。
+5. 新 Session 发送同一任务的 `discovery=lazy` 版本，找到各角色的 list_skills → load_skill；比较 requests 和 usage。
+6. 新 Session 发送 README 的 live GOOGL prompt，核对真实来源、截至时间、目标交易周和标题证据降级。
 
-## 65 分钟观众实践
+正文仅保留三张真实截图：Workflow 耗时、加载后的请求内容、LAZY 目录调用；其他运行现场查看即可。
 
-先得到报告，再理解 Discovery 和生命周期，最后换 Skill。慢组只完成默认任务与保守审查员挑战；快组做第三方导入、Registry 或真实 EAGER／LAZY 对照。
+以下机制 prompt 可在 UI 直接发送，不调用 Gemini：
 
-只换 SKILL.md 后运行即可，项目每次重新检查并记录哈希。若增加新 Skill，需要在角色配置中映射；这不需要重写 Agent 代码。
+```text
+lab discovery
+lab lifecycle
+lab sizing
+lab artifacts
+lab registry
+```
 
-数据失败时显示真实原因。DEMO 是原创合成数据；它是机制练习，不是历史美股预测。live 的事件数据仅 RSS 标题，未核验全文，信心有上限。
+每行独立发送。lab 输出由代码控制真实 ADK 工具操作，Trace 只有入口节点；不能把 JSON 中的状态序列称作模型自主决策。CLI 等价命令均在 README 对应步骤保留。
 
-## 机制实验的讲解边界
+## 方法改造
 
-- lifecycle lab 直接调用真实 ADK 工具，不是 Gemini 自主发现能力。
-- 原生程序化 `SkillToolset.load_skill` 与模型调用的 load_skill 工具不同：前者不自动把指令正文写入模型对话。
-- max_active_skills 只限制 bounded；ephemeral 在下一 invocation 失效。
-- 卸载不能清除已读参考资料、事实或产物；指令清理也不是安全撤权的完整替代。
-- 当前 Artifact lab 用 code-executor 路径，不能直接推论 Environment 相同行为。
-- UnsafeLocalCodeExecutor 不提供安全隔离；只给确定的小脚本实验启用。
-- Registry lab 是本地关键词检索；托管 Registry、向量搜索和云端部署尚未纳入。
+每组可分工运行、Skill 设计、数据、验证、展示。完整模型研究从主实例串行发起。
+
+先保留基线证据与报告，再修改 SKILL.md 或参考资料，执行 doctor／offline-check，在 UI 新建 Session 后发送同一基线 prompt。文件每次重新检查与构造，无需重启 Web 服务；修改 Python 代码才需重启。
+
+添加 Skill 时需更新 roles 映射，同时检查 bounded 上限。比较两份 decision 的 data_sha256 与 Skill 哈希，防止把数据变化误归因于方法。
+
+## 机制边界
+
+- EAGER／LAZY 控制模型目录披露，本地 Skill 均先解析；LAZY 先 list 是项目 Prompt 的额外要求。
+- max_active_skills 只限制 bounded；ephemeral 在下一 invocation 失效，一轮可包含多次模型调用。
+- 卸载不清除已经读过的参考资料、事实、业务 State 或产物，也不删除目录。
+- 脚本实验使用 code-executor 与 ArtifactService，UnsafeLocalCodeExecutor 不提供沙箱；只执行包内短脚本。
+- Registry 是五个已检查 Skill 的本地关键词索引，无向量检索或托管服务。
+- 原生 Trace 与项目保存的 requests／trace／usage 文件分别由框架和应用负责。
 
 ## 救场
 
-| 阻塞 | 当场继续方式 |
+| 阻塞 | 继续方式 |
 | --- | --- |
-| 配额／Key | 先完成所有无 Key 机制实验，再由组内主实例尝试一次真实调用 |
-| 网络 | 使用固定输入；报告中明确标记 mode，不伪装实时 |
-| 模型没加载 Skill | 展示失败 trace，讨论描述和接线；不把失败当成完成 |
-| 时间不足 | 第三方与 Registry 选做；保住一个报告、一个机制对照、一个改造 |
-| 不可用 Skill | 演示跳过原因，回到课程内五个小 Skill |
+| 配额／Key | 先完成无模型 lab，再由组内主实例尝试真实调用 |
+| 网络／数据 | 显式切换 fixture，报告保留合成数据标记 |
+| 模型跳过必要方法 | 查看失败 trace 和 requests，检查描述与角色要求 |
+| UI 提示会话已研究 | 新建 Session，再发送 prompt |
+| 时间不足 | 保留一个报告、一个机制对照、一个方法改造；扩展选做 |
 
-## 展示评价
-
-要求每组讲清：改动、理由、执行证据、局限。对照必须固定输入，不能用两天不同的数据强行证明 Skill 更有效。信心不是预测概率，不按谁更激进或谁“猜中”未来排名。
+展示要求：改动、理由、执行证据、局限。信心不是预测概率，不按未来收益排名。

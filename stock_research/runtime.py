@@ -98,7 +98,7 @@ def build_team(bundle: dict, discovery: str, before_model=None):
         toolsets[role] = toolset
     return Workflow(name="research_team", edges=[("START", *agents)], timeout=180), toolsets, reports, model
 
-async def run(bundle: dict, discovery: str, max_calls: int | None = None):
+async def run(bundle: dict, discovery: str, max_calls: int | None = None, *, web_context=None):
     environment()
     if not os.getenv("GEMINI_API_KEY"):
         raise ValueError("Set GEMINI_API_KEY in .env; use offline-check for a no-key mechanical check")
@@ -130,46 +130,67 @@ async def run(bundle: dict, discovery: str, max_calls: int | None = None):
         out.mkdir()
         (out / "evidence.json").write_text(json.dumps(bundle, ensure_ascii=False, indent=2))
         requests = []
+        event_start = len(web_context.session.events) if web_context else 0
         def observe(callback_context, llm_request):
             if len(requests) >= cfg["max_model_calls"]:
                 raise ValueError("global model-step limit reached across all workflow nodes")
+            if web_context:
+                usage = [e.usage_metadata for e in web_context.session.events[event_start:] if e.usage_metadata]
+                estimate = sum((u.prompt_token_count or 0)*.75/1e6 +
+                    ((u.candidates_token_count or 0)+(u.thoughts_token_count or 0))*3.75/1e6 for u in usage)
+                if ledger["estimated_usd"] + estimate >= cfg["max_estimated_usd"]:
+                    raise ValueError("group cost estimate reached; no further model step allowed")
             requests.append({"agent":callback_context.agent_name,"tools":list(llm_request.tools_dict),
                 "system_instruction":llm_request.config.system_instruction})
             (out / "requests.json").write_text(json.dumps(requests,ensure_ascii=False,indent=2,default=str))
-        team, toolsets, reports, model = build_team(bundle, discovery, observe)
-        sessions = InMemorySessionService()
-        session = await sessions.create_session(app_name="workshop", user_id="group", state={"ticker":bundle["ticker"],"as_of":bundle["as_of"]})
-        runner = Runner(node=team, app_name="workshop", session_service=sessions, artifact_service=InMemoryArtifactService())
+        toolsets = {}
         trace, counts = [], {"input":0,"output":0,"model_responses":0,"tool_calls":0}
         started = time.monotonic()
         failure = None
+        def record_event(event):
+            record = {"author":event.author, "calls":[], "responses":[]}
+            usage = getattr(event,"usage_metadata",None)
+            if usage:
+                counts["input"] += usage.prompt_token_count or 0
+                counts["output"] += (usage.candidates_token_count or 0)+(usage.thoughts_token_count or 0)
+                counts["model_responses"] += 1
+            for part in (event.content.parts if event.content else []) or []:
+                if part.function_call:
+                    counts["tool_calls"] += 1
+                    record["calls"].append({"name":part.function_call.name,"args":part.function_call.args})
+                if part.function_response:
+                    record["responses"].append({"name":part.function_response.name,"response":part.function_response.response})
+            if record["calls"] or record["responses"]: trace.append(record)
+            (out / "trace.json").write_text(json.dumps(trace, ensure_ascii=False, indent=2, default=str))
         try:
-            async for event in runner.run_async(user_id="group", session_id=session.id,
-                new_message=types.Content(role="user", parts=[types.Part(text=f"Analyze {bundle['ticker']} for {bundle['target_week']}. as_of={bundle['as_of']}; mode={bundle['mode']}. Load your skills before analysis.")]),
-                run_config=RunConfig(max_llm_calls=cfg["max_model_calls"])):
-                record = {"author":event.author, "calls":[], "responses":[]}
-                usage = getattr(event,"usage_metadata",None)
-                if usage:
-                    counts["input"] += usage.prompt_token_count or 0
-                    counts["output"] += (usage.candidates_token_count or 0)+(usage.thoughts_token_count or 0)
-                    counts["model_responses"] += 1
-                for part in (event.content.parts if event.content else []) or []:
-                    if part.function_call:
-                        counts["tool_calls"] += 1
-                        record["calls"].append({"name":part.function_call.name,"args":part.function_call.args})
-                    if part.function_response:
-                        record["responses"].append({"name":part.function_response.name,"response":part.function_response.response})
-                if record["calls"] or record["responses"]: trace.append(record)
-                (out / "trace.json").write_text(json.dumps(trace, ensure_ascii=False, indent=2, default=str))
-                estimate = counts["input"]*.75/1e6 + counts["output"]*3.75/1e6
-                if ledger["estimated_usd"]+estimate >= cfg["max_estimated_usd"]:
-                    raise ValueError("group cost estimate reached; no further model step allowed")
+            team, toolsets, reports, model = build_team(bundle, discovery, observe)
+            if web_context:
+                # Run inside the Dev UI invocation so native workflow/tool/LLM spans
+                # retain the UI session and are visible in its Trace and Events tabs.
+                for key, value in {"ticker":bundle["ticker"], "as_of":bundle["as_of"]}.items():
+                    web_context.state[key] = value
+                try:
+                    await web_context.run_node(team)
+                finally:
+                    for event in web_context.session.events[event_start:]: record_event(event)
+                final_session = web_context.session
+            else:
+                sessions = InMemorySessionService()
+                session = await sessions.create_session(app_name="workshop", user_id="group", state={"ticker":bundle["ticker"],"as_of":bundle["as_of"]})
+                runner = Runner(node=team, app_name="workshop", session_service=sessions, artifact_service=InMemoryArtifactService())
+                async for event in runner.run_async(user_id="group", session_id=session.id,
+                    new_message=types.Content(role="user", parts=[types.Part(text=f"Analyze {bundle['ticker']} for {bundle['target_week']}. as_of={bundle['as_of']}; mode={bundle['mode']}. Load your skills before analysis.")]),
+                    run_config=RunConfig(max_llm_calls=cfg["max_model_calls"])):
+                    record_event(event)
+                    estimate = counts["input"]*.75/1e6 + counts["output"]*3.75/1e6
+                    if ledger["estimated_usd"]+estimate >= cfg["max_estimated_usd"]:
+                        raise ValueError("group cost estimate reached; no further model step allowed")
+                final_session = await sessions.get_session(app_name="workshop",user_id="group",session_id=session.id)
             for role, required in cfg["roles"].items():
                 loaded = {c["args"].get("skill_name") for e in trace if e["author"] == role
                     for c in e["calls"] if c["name"] == "load_skill"}
                 if set(required)-loaded:
                     raise ValueError(f"{role} did not load all required skills; refusing to publish a successful report")
-            final_session = await sessions.get_session(app_name="workshop",user_id="group",session_id=session.id)
             raw = final_session.state.get("review")
             decision = validate_decision(json.loads(raw) if isinstance(raw,str) else raw, bundle)
             report = decision.model_dump() | {"ticker":bundle["ticker"], "as_of":bundle["as_of"],"target_week":bundle["target_week"],
@@ -177,7 +198,7 @@ async def run(bundle: dict, discovery: str, max_calls: int | None = None):
                 "provenance":{"model":model,"adk":"2.13.0","data_sha256":bundle["sha256"],"discovery":discovery}}
             (out / "decision.json").write_text(json.dumps(report,ensure_ascii=False,indent=2))
             (out / "report.md").write_text(render_report(report))
-        except Exception as exc:
+        except BaseException as exc:
             failure = exc
             (out / "failure.json").write_text(json.dumps({"type":type(exc).__name__,"message":str(exc)[:1000]}, ensure_ascii=False, indent=2))
         finally:
@@ -188,7 +209,9 @@ async def run(bundle: dict, discovery: str, max_calls: int | None = None):
             for k in ["input","output","estimated_usd"]: ledger[k] += counts[k]
             ledger_path.write_text(json.dumps(ledger,indent=2))
             for t in toolsets.values(): await t.close()
-        if failure: raise RuntimeError(f"Run failed; partial trace and usage saved at {out}") from failure
+        if failure:
+            if not isinstance(failure, Exception): raise failure
+            raise RuntimeError(f"Run failed; partial trace and usage saved at {out}") from failure
         return out
     finally:
         lock.unlink(missing_ok=True)

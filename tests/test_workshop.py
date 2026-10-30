@@ -95,7 +95,9 @@ def test_cli_discovery_uses_config_unless_overridden(monkeypatch,capsys,flag,exp
     assert received == [expected]
     assert json.loads(capsys.readouterr().out)["output"] == "runs/test"
 
-def test_real_runner_with_scripted_model(tmp_path,monkeypatch):
+@pytest.mark.parametrize("entry", ["cli", "web"])
+@pytest.mark.parametrize("limit", [None, 1])
+def test_real_runner_with_scripted_model(tmp_path,monkeypatch,entry,limit):
     """Exercise actual ADK Runner, dynamic tools and state; zero network/token usage."""
     from google.adk.models.base_llm import BaseLlm
     from google.adk.models.llm_response import LlmResponse
@@ -103,6 +105,7 @@ def test_real_runner_with_scripted_model(tmp_path,monkeypatch):
     from pydantic import PrivateAttr
     import stock_research.runtime as rt
     cfg=rt.config()
+    if limit: cfg["max_model_calls"]=limit
     class ScriptedModel(BaseLlm):
         role: str
         _step: int = PrivateAttr(default=0)
@@ -134,7 +137,57 @@ def test_real_runner_with_scripted_model(tmp_path,monkeypatch):
     monkeypatch.setattr(rt,"config",lambda:cfg)
     monkeypatch.setattr(rt,"ROOT",tmp_path)
     monkeypatch.setenv("GEMINI_API_KEY","not-a-real-key")
-    out=asyncio.run(rt.run(load_bundle("fixture","DEMO"),"eager"))
+    if entry == "cli":
+        if limit:
+            with pytest.raises(RuntimeError): asyncio.run(rt.run(load_bundle("fixture","DEMO"),"eager"))
+        else:
+            asyncio.run(rt.run(load_bundle("fixture","DEMO"),"eager"))
+    else:
+        from google.adk.runners import Runner
+        from google.adk.sessions import InMemorySessionService
+        from google.adk.artifacts import InMemoryArtifactService
+        import stock_research.web as web
+        monkeypatch.setattr(web,"ROOT",tmp_path)
+        async def run_web():
+            service=InMemorySessionService()
+            session=await service.create_session(app_name="research",user_id="test")
+            runner=Runner(node=web.root_agent,app_name="research",session_service=service,
+                artifact_service=InMemoryArtifactService())
+            text="研究 mode=fixture ticker=DEMO discovery=eager，给出证据、反证和信心。"
+            events=[e async for e in runner.run_async(user_id="test",session_id=session.id,
+                new_message=types.Content(role="user",parts=[types.Part(text=text)]))]
+            final=await service.get_session(app_name="research",user_id="test",session_id=session.id)
+            if limit:
+                assert not final.state.get("review")
+                assert any("运行未完成：" in (p.text or "") for e in events if e.content for p in e.content.parts or [])
+            else:
+                assert all(final.state.get(role) for role in cfg["roles"])
+                assert {"technical","catalyst","review"} <= {e.author for e in events}
+                assert any("运行记录：" in (p.text or "") for e in events if e.content for p in e.content.parts or [])
+            # A second prompt must not silently reuse historical evidence/Skills.
+            repeated=[e async for e in runner.run_async(user_id="test",session_id=session.id,
+                new_message=types.Content(role="user",parts=[types.Part(text=text)]))]
+            assert any("New Session" in (p.text or "") for e in repeated if e.content for p in e.content.parts or [])
+        asyncio.run(run_web())
+    out=next(p for p in (tmp_path/"runs").iterdir() if p.is_dir())
+    assert not (tmp_path/"runs/.running").exists()
+    assert json.loads((tmp_path/"runs/budget.json").read_text())["runs"] == 1
+    if limit:
+        assert not (out/"decision.json").exists()
+        assert (out/"failure.json").exists() and (out/"usage.json").exists()
+        assert len(json.loads((out/"requests.json").read_text())) == 1
+        return
     d=json.loads((out/"decision.json").read_text())
     assert d["action"]=="HOLD" and d["provenance"]["model"]=="scripted-test"
     assert (out/"trace.json").exists() and not (tmp_path/"runs/.running").exists()
+    usage=json.loads((out/"usage.json").read_text())
+    assert usage["tool_calls"] == 8 and usage["model_responses"] == 0
+
+@pytest.mark.parametrize("text", [
+    "研究 mode=fixture ticker=GOOGL", "研究 mode=live ticker=../etc",
+    "研究 mode=live ticker=GOOGL discovery=other", "mode=live mode=fixture ticker=DEMO",
+    "研究 mode=fixture ticker=DEMO executor=shell", "lab arbitrary",
+])
+def test_web_rejects_invalid_prompt_before_running(text):
+    from stock_research.web import parse_prompt
+    with pytest.raises(ValueError): parse_prompt(text)

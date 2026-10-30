@@ -39,12 +39,55 @@
 ## 尚未验证／有意不包含
 
 - **Cloud Shell 未验证**，按本轮要求暂不执行；不能将本地通过等同于云端通过。
-- 真实 Gemini 的完整 LAZY 三角色对照尚未执行；只验证了该模式的原生请求机制。活动前可用手册中的命令补测。
 - 第三方适配版由 ADK 工具实际执行过，但尚未让 Gemini 自主选择并运行它。
-- 托管 Google Cloud Skill Registry、向量检索、Vertex AI、Cloud Run、Web Preview 未纳入本地验收。
+- 托管 Google Cloud Skill Registry、向量检索、Vertex AI、Cloud Run 未纳入本地验收。
 - 新闻只使用 RSS 标题；未来事件日历、新闻全文与权威公告核验还未接入。
 - 港股／A 股、通用跨领域预设、模型短审查、复杂预测回测未实现；核心范围为美股研究和零 token 静态能力检查。
 - 兼容性检查识别已知要求，不能证明任意第三方 Skill 的语义兼容或代码安全。
 - 费用限制覆盖同一目录内的本项目运行，不能替代平台硬额度，也不能汇总其他程序的消费。
 
 依赖当前有少量 pandas 的弃用提示，相关检查通过；Skills 实验开关提示属预期行为，未隐藏它们。
+
+
+## 2026-10-30 · README 与 Web UI
+
+本机使用 ADK 2.13.0、Python 3.12.8、Gemini 3.8 Flash，运行 README 中的原生 `adk web web_agents --port 8000 --no-reload --no_use_local_storage`。
+
+| 验证项 | 结果 |
+| --- | --- |
+| 文档结构 | README 从 1,137 行整理为约 590 行；实现与静态检查细节保留在 docs/implementation.md |
+| Web 入口 | research 被原生 AgentLoader 发现；prompt 选择 fixture/live、ticker 与 eager/lazy |
+| 原生 Trace | 在当前 UI invocation 中动态运行同一 Workflow；三个角色、模型与工具 span 归入本次 Session，调用树与耗时可见 |
+| 请求查看 | 模型 span 的 Event ID 可跳到 Events 的 Request／Response；请求包含 load_skill 正文与 State 注入后的任务值 |
+| UI 机制实验 | discovery、lifecycle、sizing、artifacts、registry 五个 prompt 均实际操作通过；不调用 Gemini |
+| 实验隔离 | 同一 Session 重复研究提示 New Session；每次新研究重新检查并读取 Skill／YAML |
+| CLI／Web 回归 | **28 passed**；实际 Runner 与脚本化模型覆盖两种入口、State 交接、必要 Skill、调用上限失败留档、账本计次与锁清理，禁止网络访问 |
+| 文档与图片 | 本地链接、锚点、代码围栏检查通过；一张官方 PNG 和三张真实 UI PNG，有来源与许可证；README 共七处图片 |
+
+### 真实 Gemini Web UI 运行
+
+以下三次均通过浏览器输入 prompt 发起，结果通过最终程序校验。
+
+| 输入 | Discovery | 模型响应 | 工具调用 | runtime 耗时 | 估算费用 |
+| --- | --- | --- | --- | --- | --- |
+| 合成 DEMO | EAGER | 9 | 17 | 28.23 秒 | $0.016508 |
+| 合成 DEMO | LAZY | 13 | 21 | 39.46 秒 | $0.021883 |
+| 真实 GOOGL | EAGER | 9 | 20 | 43.31 秒 | $0.022519 |
+
+本轮费用估算合计 $0.060910；不是实际账单。EAGER／LAZY 使用相同合成输入；LAZY 三个角色各调用一次 list_skills。该次 LAZY 多了一次取证步骤，不能把全部耗时差异归因于 Discovery。
+
+UI 时间线覆盖整个请求，runtime 的 usage 只计研究流程，因此截图 EAGER 的总延迟 28.68 秒与 usage 中 28.23 秒不同。正式报告应查看对话最后的 Markdown 或 decision.json；中间 review JSON 尚未经过数据质量后处理。
+
+截图对应本机 runs/20261030T060712-f6f7d1 与 runs/20261030T061613-d172a5；live 记录为 runs/20261030T061712-729e68。原始记录、真实行情与凭据不提交 Git。
+
+Cloud Shell／Web Preview 仍未验证。所有截图均为合成输入；本轮没有改写核心 Skill 的方法内容。
+
+
+## 2026-10-30 · 代码讲解顺序与开发接续
+
+- README 改为概念 → 环境 → 核心代码／预检／配置 → 两种运行方式 → 实验；Web UI 启动已移至代码之后。
+- 正文详细展开 doctor、scan／inspect_skill、accepted_skills、offline-check 的做法、代码、返回语义与复用边界。
+- 新增仓库内 AGENTS.md 与 docs/progress.md，整理最新约定、已完成范围、验证证据、跨设备步骤和未完成事项。
+- 重新执行 pytest：**28 passed**；pip check 无依赖冲突。doctor 五个核心 Skill 均 SUPPORTED；offline-check 三角色构造通过且 model_called=false。
+- 七份 Markdown 的链接、锚点、代码围栏与 23 段 Python／JSON／YAML 示例通过检查；发布候选内容与忽略规则检查通过。
+- 本次没有新增 Gemini 请求；沿用上节已完成的真实 CLI／Web 运行证据。Cloud Shell／Web Preview 仍按要求暂缓。

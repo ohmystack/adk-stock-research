@@ -45,3 +45,4 @@ skills-lock.json
 .DS_Store
 .idea/
 .vscode/
+.adk/
