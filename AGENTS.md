@@ -11,6 +11,7 @@
 ## 文档与演示要求
 
 - `README.md` 是唯一面向活动的演讲与操作主文档，不恢复独立 WORKSHOP.md 或 ZIP 分发；通过 HTTPS GitHub 仓库获取与更新。
+- `README.en.md` 是为本次活动国际观众制作的英文快照，不要求后续同步。今后文档内容更新只维护中文 `README.md`；除非用户另行要求，不同步修改英文版。维护约定只记在内部文档，不在中英文 README 中声明。
 - 演讲顺序：ADK／Skill 概念 → 股票研究任务设计、确定性输入、角色与方法分工及调用顺序 → 环境安装与 Key 配置 → 函数／Tool 与预检 → SkillToolset／Agent／Workflow／Runner → 实际运行 → Web UI 查看请求与返回 → Discovery 对照 → 本地和 Google Cloud Registry → 修改方法与扩展。
 - 环境准备里不启动 Web UI。讲完代码进入运行章节时，统一介绍 CLI 和 ADK Web UI 两种方式；后续每种实际实验都保留对应命令和 UI prompt。
 - 第 04 节先说明 ADK 对 Skill 的支持边界：方法需要的工具、数据、脚本执行环境仍由应用提供。再介绍项目实现的 `doctor`、`scan()`、`inspect_skill()`、`accepted_skills()` 与预检，说明这套功能可以复用到其他项目。`offline-check` 简述做了什么与不调用模型即可，不展开实现代码。

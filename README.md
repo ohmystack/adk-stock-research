@@ -2,6 +2,10 @@
 
 **Google ADK Python × Gemini · 美股下周研究实践**
 
+[English](README.en.md)
+
+推荐前置阅读（ADK + Skill 基础）：[Workshop: 用 ADK 玩转 Skill](https://my.feishu.cn/wiki/EVeAwoOETiayJzk4jIMcARY2nKd)
+
 本项目用三个 Agent 和五个 Skill，完成从证据准备、价格与新闻分析到风险审查的美股下周研究，生成带来源、反证、信心与失效条件的报告。项目只做研究，不执行交易。
 
 全文沿着一次研究展开：先明确输入与分工，准备工具，在代码中创建并运行团队，再通过 Web UI 观察请求、模型返回和工具调用。之后对比 EAGER／LAZY，了解 Registry，并修改研究方法做实验。

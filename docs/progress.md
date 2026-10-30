@@ -28,6 +28,16 @@
 
 ## 本次修改（2026-10-31）
 
+### 前置阅读入口
+
+- 中文 README 在 English 下方、正文之前增加“推荐前置阅读（ADK + Skill 基础）”，链接文字为“Workshop: 用 ADK 玩转 Skill”，指向用户之前的飞书文章。
+
+### 英文 README 活动快照
+
+- 新增 `README.en.md`，完整翻译中文 README 的 11 节，保留代码、命令、锚点及图片引用；Skill 引文标明为译文，Web prompt 使用相同显式参数的英文表达。
+- 中英文 README 提供互相切换的语言入口；英文版说明部分资料及 Agent 输出仍为中文。
+- 按用户要求，后续只维护中文 README，不同步更新英文快照；维护约定只记录在 AGENTS.md 等内部文档，不在中英文 README 中声明。
+
 ### README 精简与 Web UI 操作指引
 
 - 第 04 节先说明 ADK 加载 Skill 后仍需应用提供工具、数据和执行环境，再介绍可复用的兼容性检查与加载筛选；`offline-check` 删除实现摘录，只保留检查范围和不调用模型的说明。
@@ -74,6 +84,7 @@
 
 ### 本次复核（2026-10-31）
 
+- 英文快照 11 节、53 个代码块与中文版本逐项核对：20 段 Python 的 AST、18 段 Bash、2 段 JSON、1 段 YAML 保持一致；8 处图片引用保留。检查 106 处本地链接及锚点，9 条中英文 Web prompt 经现有解析函数确认路由相同；本轮未调用模型。
 - README 精简后，第 07 节无源码片段，第 08 节集中于 Discovery；七份 Markdown 的链接、锚点、围栏、表格与代码摘录检查通过。四张标注 SVG 的嵌入 PNG 与原始文件逐字节一致，均已渲染目视检查；详见 VALIDATION.md 的“README 精简与截图指引”。
 - 本轮重排后，README 的 65 个代码围栏闭合，26 段 Python、20 段 Bash、2 段 JSON 与 2 段 YAML 通过语法／解析检查；七份 Markdown 的本地链接、锚点与表格结构通过检查，五段 Skill 引文与源文件逐字匹配，五组 lab 均保留 CLI／UI 入口。
 - 两张 SVG 通过 XML 解析与 PNG 渲染目视检查；本地 ADK 2.13.0 的参数默认值、GCPSkillRegistry 签名、Web --allow_origins 的 regex 支持已核对。doctor 五个 Skill 均 SUPPORTED；offline-check 显示 model_called=false，三角色构造通过。未重跑模型或云端服务，详细记录见 VALIDATION.md 的“演讲主线、Trace 与 Registry”。

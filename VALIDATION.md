@@ -145,3 +145,14 @@ Cloud Shell／Web Preview 仍未验证。所有截图均为合成输入；本轮
 - 七份 Markdown 的本地链接、锚点、代码围栏和表格检查通过；Python 摘录通过 AST 解析，Bash 通过 bash -n，JSON／YAML 通过解析。五段 Skill 引文仍与源文件匹配，五个 lab 在主文档或实现参考中均保留 CLI／Web 入口。
 - 四张标注 SVG 通过 XML 解析和 sharp PNG 渲染，并逐张目视检查红圈位置。SVG 嵌入的 PNG 与原始 trace-workflow.png／trace-request.png／trace-lazy.png 逐字节一致，仅裁剪显示区域和叠加操作标记。
 - 检查确认第 07 节没有源码或命令片段，第 08 节不再包含参数归属表和生命周期正文；git diff --check 通过。运行实现和依赖未修改，未重跑 pytest、Gemini 或行情抓取。
+
+## 2026-10-31 · 英文 README 活动快照
+
+- 新增 `README.en.md`，完整翻译现有 11 节，标题层级与 11 个显式章节锚点保持一致；中英文 README 提供互相切换的语言入口。按用户后续要求，维护规则只记录在 AGENTS.md 等内部文档，不在中英文 README 中声明。
+- 53 个代码块顺序与类型匹配：20 段 Python 的 AST 与中文版本一致；18 段 Bash 逐字一致并通过 `bash -n`；2 段 JSON、1 段 YAML 的解析值一致。Skill 原文节选标明为英文译文。
+- README、英文版、AGENTS、progress 与本文共 106 处本地链接及锚点检查通过；原有外链与 8 处图片引用保留，图片文件未改动。英文正文无遗漏的中文段落，保留实现参考中已有的中文锚点。
+- 9 条中英文 Web prompt 通过现有 `parse_prompt()`，解析结果逐项一致。只进行文档检查与确定性参数解析，未重跑 pytest、Gemini 研究或行情抓取。
+
+## 2026-10-31 · 前置阅读入口
+
+- 中文 README 在 English 下方、正文之前增加推荐前置阅读链接；链接文字为“Workshop: 用 ADK 玩转 Skill”，目标地址使用用户提供的飞书 URL。位置、Markdown 格式与 `git diff --check` 检查通过。
