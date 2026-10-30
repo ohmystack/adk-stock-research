@@ -91,3 +91,43 @@ Cloud Shell／Web Preview 仍未验证。所有截图均为合成输入；本轮
 - 重新执行 pytest：**28 passed**；pip check 无依赖冲突。doctor 五个核心 Skill 均 SUPPORTED；offline-check 三角色构造通过且 model_called=false。
 - 七份 Markdown 的链接、锚点、代码围栏与 23 段 Python／JSON／YAML 示例通过检查；发布候选内容与忽略规则检查通过。
 - 本次没有新增 Gemini 请求；沿用上节已完成的真实 CLI／Web 运行证据。Cloud Shell／Web Preview 仍按要求暂缓。
+
+
+## 2026-10-31 · README 机制实验代码
+
+- 第 05／06／08 节补充五个 lab 的关键配置、ADK 调用与结果解释；仅修改文档，保留每个实验的 CLI 和 Web prompt。
+- README 的 55 个代码围栏闭合；17 段 Python 通过 AST 语法检查，2 段 JSON、2 段 YAML 解析通过；42 处本地链接及锚点有效，五组 lab 命令均存在。`git diff --check` 通过。
+- 尝试以下四项现有测试，覆盖 Discovery、生命周期、脚本 Artifact、Position Sizer 和 Registry：
+
+```bash
+.venv/bin/python -m pytest -q tests/test_workshop.py -k 'native_lifecycle_and_history_pruning or native_discovery_and_registry or native_script_artifact_roundtrip or third_party_adk_script_roundtrip'
+```
+
+- 测试在收集阶段退出，尚未执行用例：导入 `pydantic_core._pydantic_core` 时，macOS 报 `code signature ... not valid for use in process: library load disallowed by system policy`。获授权在沙箱外重试，结果相同。
+- 首轮文档检查通过，测试失败原因及后续环境修复、重跑结果见下。没有请求 Gemini 或抓取行情。
+
+### macOS 隔离标记修复与回归
+
+- 用户报告 `_yaml.cpython-312-darwin.so` 无法通过 Apple 验证。检查发现 `.venv`、PyYAML 与 pydantic_core 扩展携带相同的 `com.apple.quarantine`，来源字段为 `sharingd`；两个扩展均通过 `codesign --verify`，文件哈希与各自安装包的 RECORD 一致。
+- 将原隔离属性备份至系统临时目录，然后仅对项目 `.venv` 执行 `xattr -d -r -s com.apple.quarantine .venv`，清除 13,224 处隔离标记；`-s` 作用于符号链接本身，不修改链接指向的外部 Python。保留其他扩展属性，没有重新签名或安装依赖。
+- 原生导入验证通过：PyYAML 6.0.3／`yaml.__with_libyaml__ == True`，Pydantic 2.14.1／pydantic_core 2.50.1。`spctl --status` 返回 `assessments enabled`，系统安全检查保持启用。
+- 修复后执行 `.venv/bin/python -m pytest -q`：**28 passed，5 warnings，7.41 秒**；覆盖五个 lab 及原有业务流程。警告为已有 pandas 弃用提示和 Skill 生命周期实验提示，本轮没有调用 Gemini。
+
+## 2026-10-31 · README 全文可读性复核
+
+- 通读全部九节，按读者理解概念、执行操作、观察结果的顺序优化说明。重点展开 Discovery 的列表与 token 开销、Session 与执行轮次、生命周期淘汰与卸载、预检范围、配置优先级、固定证据对照、第三方适配与脚本产物、预算计次和排错。
+- 说明与当前 `runtime.py`、`compatibility.py`、`data.py`、`web.py`、`labs.py`、Skill 文件及已安装的 ADK 2.13.0 生命周期实现核对；未修改运行代码。
+- README 的 55 个代码围栏闭合：17 段 Python 均通过 AST 解析，且与本轮调整前的语法树一致；2 段 JSON、2 段 YAML 均解析通过，解析值保持一致。18 段 Bash 示例通过参数分词检查，真实股票基线及修改后命令均显式使用 `--discovery eager`。
+- 43 处本地链接、图片路径及章节锚点检查通过；章节改名后的导航与 Registry 跳转有效。Markdown 表格结构正确，五个 lab 的 CLI 命令和 Web UI prompt 均保留；`git diff --check` 通过。
+- 本轮仅调整文档，未重跑 pytest、Gemini 研究或行情抓取；前面的自动测试和真实运行记录保留其原有日期与验证范围。
+
+## 2026-10-31 · 演讲主线、Trace 与 Registry
+
+- README 按研究任务设计、Skill 分工、工具、Agent／Workflow／Runner、运行、Trace、参数归属、Registry 和改造实验重新组织；保留此前预检说明与五组 lab 的 CLI／Web 入口。运行实现与依赖未改动。
+- README 的 65 个代码围栏闭合；26 段 Python 通过 AST 解析，20 段 Bash 通过 `bash -n`，2 段 JSON 与 2 段 YAML 通过解析。检查覆盖七份主文档的本地链接、章节锚点和表格结构，五段 Skill 原文引文与源文件逐字匹配。
+- 技术复核对照本地 ADK 2.13.0：请求创建、指令与 State 注入、SkillToolset 请求处理、动态工具、Gemini SDK 调用与 LlmResponse 返回链路一致；规范化 UI 的 tool_call／tool_call_response 与原始 ADK Event 的 function_call／function_response 分别说明。requests.json 明确标为回调摘要。
+- 重画 architecture.svg，新增 request-pipeline.svg。两图通过 XML 解析，经 sharp 渲染 PNG 并逐张目视检查；临时预览留在 `/tmp`，未替代或伪造原有真实 Trace 截图。
+- `doctor`：ADK 2.13.0，五个核心 Skill 均为 SUPPORTED。`offline-check`：model_called=false，technical／catalyst／review 与数据、指标、目标周构造通过；保留预期的生命周期实验功能提示。
+- 已用本地 API 签名确认 GCPSkillRegistry 的 project_id／location／credentials 参数，SkillToolset 默认 LAZY，SkillLifecycleConfig 默认 PERSISTENT、BOUNDED 上限 5。Google Cloud Agent Registry 的注册、ADC、角色、版本和下载说明已查阅官方文档；没有启用 API、创建资源或接入云 Registry。
+- `adk web --help` 与本地 CORS 实现确认 --allow_origins 支持 regex 前缀；README 与讲师备忘补充用户指定的 Cloud Shell 命令。Cloud Shell／Web Preview 端到端仍未验证。
+- `git diff --check` 通过。本轮只更新文档与 SVG，未调用 Gemini，未重复全量代码回归；此前 28 passed 的运行事实保留在本文件上方。

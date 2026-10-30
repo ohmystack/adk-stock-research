@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1110" viewBox="0 0 1280 1110" role="img" aria-labelledby="title desc">
+  <title id="title">ADK 如何加工一个 Skill Agent 的模型请求</title>
+  <desc id="desc">角色指令和 State 模板、SkillToolset 和对话历史共同构成 LlmRequest。项目 before_model_callback 记录摘要。Gemini 接口收到模型、消息和配置后返回文本或工具调用，ADK 执行工具，再把结果放入下一轮请求，最后结构化输出写入 State。</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#071321"/><stop offset="1" stop-color="#122638"/></linearGradient>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#51e3c2" stroke-width="1.5"/></marker>
+    <marker id="looparrow" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#bda7ff" stroke-width="1.5"/></marker>
+  </defs>
+  <style>
+    text{font-family:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",Arial,sans-serif;fill:#e8f2ff}
+    .title{font-size:30px;font-weight:700}.label{font-size:23px;font-weight:600}.body{font-size:20px;fill:#bfd0df}.note{font-size:18px;fill:#a5bfd2}.code{font-size:20px;fill:#51e3c2}.purple{font-size:20px;fill:#c8b8ff}
+    .box{fill:#132b3d;stroke:#2b4a5f;stroke-width:1.5}.focus{fill:#102e3d;stroke:#51e3c2;stroke-width:1.5}.flow{fill:none;stroke:#51e3c2;stroke-width:2;marker-end:url(#arrow)}.loop{fill:none;stroke:#bda7ff;stroke-width:2;stroke-dasharray:6 5;marker-end:url(#looparrow)}
+  </style>
+  <rect width="1280" height="1110" rx="24" fill="url(#bg)"/>
+  <text x="40" y="52" class="title">从 Agent 配置到 Gemini 请求：一次工具调用循环</text>
+  <text x="40" y="86" class="note">一个 invocation 可以包含多次模型请求；Skill 正文通常通过工具返回进入后续请求。</text>
+  <rect x="40" y="120" width="380" height="155" rx="16" class="box"/>
+  <text x="62" y="159" class="label">LlmAgent</text>
+  <text x="62" y="198" class="body">角色 instruction · 输出 schema</text>
+  <text x="62" y="231" class="body">填入显式引用的 State 占位符</text>
+  <rect x="450" y="120" width="380" height="155" rx="16" class="box"/>
+  <text x="472" y="159" class="label">SkillToolset</text>
+  <text x="472" y="198" class="body">目录披露 · Skill 使用说明</text>
+  <text x="472" y="231" class="body">基础工具与激活 Skill 的工具</text>
+  <rect x="860" y="120" width="380" height="155" rx="16" class="box"/>
+  <text x="882" y="159" class="label">Session 事件历史</text>
+  <text x="882" y="198" class="body">用户消息 · 模型消息</text>
+  <text x="882" y="231" class="body">函数调用与工具返回</text>
+  <path d="M230 275 V320" class="flow"/>
+  <path d="M640 275 V320" class="flow"/>
+  <path d="M1050 275 V320" class="flow"/>
+  <rect x="40" y="330" width="1200" height="145" rx="16" class="focus"/>
+  <text x="62" y="370" class="label">ADK 请求处理器 → LlmRequest</text>
+  <text x="62" y="411" class="code">config.system_instruction</text>
+  <text x="62" y="444" class="note">角色、框架说明、Skill 目录等</text>
+  <text x="530" y="411" class="code">contents</text>
+  <text x="530" y="444" class="note">对话、已加载正文、工具结果</text>
+  <text x="950" y="411" class="code">config.tools</text>
+  <text x="950" y="444" class="note">函数名、说明、参数 schema</text>
+  <path d="M230 475 V520" class="flow"/>
+  <rect x="40" y="530" width="380" height="145" rx="16" class="box"/>
+  <text x="62" y="570" class="label">before_model_callback</text>
+  <text x="62" y="611" class="code">requests.json</text>
+  <text x="62" y="644" class="note">本项目仅记录系统说明与工具名</text>
+  <path d="M425 602 H440" class="flow"/>
+  <rect x="450" y="530" width="380" height="145" rx="16" class="focus"/>
+  <text x="472" y="570" class="label">Gemini 模型适配器</text>
+  <text x="472" y="611" class="code">generate_content_async()</text>
+  <text x="472" y="644" class="note">SDK 接收 model / contents / config</text>
+  <path d="M835 602 H850" class="flow"/>
+  <rect x="860" y="530" width="380" height="145" rx="16" class="box"/>
+  <text x="882" y="570" class="label">Gemini → LlmResponse</text>
+  <text x="882" y="611" class="body">文本或 function_call</text>
+  <text x="882" y="644" class="note">同时带回 usage 等响应信息</text>
+  <path d="M1050 675 V720" class="flow"/>
+  <rect x="40" y="730" width="1200" height="145" rx="16" class="box"/>
+  <text x="62" y="770" class="label">ADK 执行函数调用 → function_response 写入事件历史</text>
+  <text x="62" y="812" class="code">load_skill → 方法正文</text>
+  <text x="530" y="812" class="code">load_skill_resource → 参考资料</text>
+  <text x="62" y="847" class="body">read_evidence / calculate_indicators → 证据与数值；激活状态改变后续可调用工具。</text>
+  <path d="M1240 800 H1260 V300 H1050 V285" class="loop"/>
+  <path d="M640 875 V940" class="flow"/>
+  <text x="722" y="918" class="purple">工具结果进入下一次 LlmRequest，模型继续判断。</text>
+  <rect x="40" y="950" width="1200" height="115" rx="16" class="box"/>
+  <text x="62" y="991" class="label">完成分析 → set_model_response → output_key 写入 State</text>
+  <text x="62" y="1030" class="body">Web 的 Request / Response 用于核对请求与返回；Trace 显示模型与工具的调用顺序和耗时。</text>
+</svg>

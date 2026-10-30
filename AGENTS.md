@@ -11,14 +11,15 @@
 ## 文档与演示要求
 
 - `README.md` 是唯一面向活动的演讲与操作主文档，不恢复独立 WORKSHOP.md 或 ZIP 分发；通过 HTTPS GitHub 仓库获取与更新。
-- 固定顺序：ADK／Skill 概念 → 环境安装与 Key 配置 → 核心代码、预检机制与 YAML → 实际运行 → Discovery／生命周期 → 修改方法 → 扩展实验。
+- 演讲顺序：ADK／Skill 概念 → 股票研究任务设计、确定性输入、角色与方法分工及调用顺序 → 环境安装与 Key 配置 → 函数／Tool 与预检 → SkillToolset／Agent／Workflow／Runner → 实际运行 → Web Trace 中请求加工、Gemini 调用与返回 → 参数归属与 Discovery／生命周期 → 本地和 Google Cloud Registry → 修改方法与扩展。
 - 环境准备里不启动 Web UI。讲完代码进入运行章节时，统一介绍 CLI 和 ADK Web UI 两种方式；后续每种实际实验都保留对应命令和 UI prompt。
 - 重点说明项目主动实现的 `doctor`、`offline-check`、`scan()`、`inspect_skill()`、`accepted_skills()`：做什么、怎样做、输出与边界，以及怎样迁移到其他项目。不要只留一个链接让读者另查源码。
-- 保留核心代码摘录、关键 Prompt、State 数据流图、EAGER／LAZY 对照和配置用途。讲逻辑与数据流，不逐行堆叠全部实现；更长细节放 `docs/implementation.md`。
+- 保留核心代码摘录、五个 Skill 的职责与关键原文、关键 Prompt、State 数据流图、EAGER／LAZY 对照和配置归属。CLI ticker 由 argparse 直取，Web 由代码解析显式参数；原生 Trace 的 Request／Response、项目 requests.json 摘要与 SDK 出站调用须明确区分。讲逻辑与数据流，不逐行堆叠全部实现；更长细节放 `docs/implementation.md`。
 - 使用中性文档语气，删除“讲师沿着／观众沿着”“不运行也能跟读”“本地已验证”等旁白和状态广告。时间安排在 `INSTRUCTOR.md`，验收明细在 `VALIDATION.md`。
 - 关键操作保留实际输出节选。明确省略字段、合成输入和历史截图口径，不把示例行情当当前市场事实。
 - 适量配图，原创图优先中文，保留 Skill 名等专有词。可用官网图、原创图与真实截图；引用外部图片时保留来源与许可。
 - Trace 截图只放在关键机制处，展示实际 Workflow、请求内容和耗时。不得生成或伪造运行截图，也无需每次运行加图。
+- Cloud Shell 的 Web 启动命令增加 `--allow_origins 'regex:https://.*.cloudshell.dev'`，保留尚未完成云端彩排的边界。云 Registry 仅介绍 ADK 2.13.0 的 GCPSkillRegistry／Agent Registry 接法、身份与版本，不接入现有团队。
 - 主文档不放作者机器的代理配置或绝对路径；开发与验证状态写 `docs/progress.md`。
 
 ## 架构与文件入口

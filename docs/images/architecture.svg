@@ -1,1 +1,66 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-label="三个研究角色如何共享证据与传递结果"><title>三个研究角色如何共享证据与传递结果</title><defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#071321"/><stop offset="1" stop-color="#122638"/></linearGradient><marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#51e3c2" stroke-width="1.4"/></marker></defs><style>text{font-family:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",Arial,sans-serif;fill:#e8f2ff}.sub{fill:#a5bfd2;font-size:20px}.tag{fill:#51e3c2;font-size:17px;letter-spacing:1px}.title{font-size:42px;font-weight:700}.small{font-size:16px;fill:#a5bfd2}.flow{stroke:#51e3c2;stroke-width:2;fill:none;marker-end:url(#arrow)}</style><rect width="1200" height="440" rx="24" fill="url(#bg)"/><text x="40" y="50" class="tag">系统架构 / 使用同一份证据，承担不同研究职责</text><rect x="40" y="90" width="280" height="90" rx="14" fill="#132b3d" stroke="#51e3c2" stroke-opacity=".7"/><text x="60" y="126" class="sub" style="font-size:22px">数据与计算工具</text><text x="60" y="156" class="small" style="font-size:15px">行情 · 指标 · 新闻标题</text><rect x="460" y="90" width="280" height="90" rx="14" fill="#132b3d" stroke="#51e3c2" stroke-opacity=".7"/><text x="480" y="126" class="sub" style="font-size:22px">技术分析师</text><text x="480" y="156" class="small" style="font-size:15px">data-quality / technical-trend</text><rect x="460" y="225" width="280" height="90" rx="14" fill="#132b3d" stroke="#51e3c2" stroke-opacity=".7"/><text x="480" y="261" class="sub" style="font-size:22px">事件分析师</text><text x="480" y="291" class="small" style="font-size:15px">news-catalyst</text><rect x="880" y="155" width="280" height="90" rx="14" fill="#132b3d" stroke="#51e3c2" stroke-opacity=".7"/><text x="900" y="191" class="sub" style="font-size:22px">风险审查员</text><text x="900" y="221" class="small" style="font-size:15px">risk-review / decision-report</text><path class="flow" d="M320 135 H450"/><path class="flow" d="M320 135 H380 V270 H450"/><path class="flow" d="M740 135 H810 V200 H870"/><path class="flow" d="M740 270 H810 V200 H870"/><text x="42" y="365" class="sub">Workflow 默认顺序调度；图中的分叉表示证据依赖，不表示并行执行。</text><text x="42" y="401" class="small">Skill 先检查再加载；最终输出 JSON、Markdown 和调用记录，不执行证券交易。</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1080" viewBox="0 0 1280 1080" role="img" aria-labelledby="title desc">
+  <title id="title">股票研究：从确定性任务输入到三个 Skill Agent 的顺序协作</title>
+  <desc id="desc">命令行由 argparse 直接读取股票参数，Web 用 parse_prompt 解析固定参数。Python 准备证据包和工具，technical、catalyst、review 依次执行并把分析写入 State，最后由 Python 校验报告。原始证据留在 bundle 中。</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#071321"/><stop offset="1" stop-color="#122638"/></linearGradient>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#51e3c2" stroke-width="1.5"/></marker>
+  </defs>
+  <style>
+    text{font-family:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",Arial,sans-serif;fill:#e8f2ff}
+    .title{font-size:30px;font-weight:700}.label{font-size:23px;font-weight:600}.body{font-size:20px;fill:#bfd0df}.note{font-size:18px;fill:#a5bfd2}.code{font-size:20px;fill:#51e3c2}.step{font-size:18px;fill:#51e3c2;letter-spacing:1px}
+    .box{fill:#132b3d;stroke:#2b4a5f;stroke-width:1.5}.flow{fill:none;stroke:#51e3c2;stroke-width:2;marker-end:url(#arrow)}.state{fill:#102237;stroke:#bda7ff;stroke-opacity:.65;stroke-dasharray:6 5}
+  </style>
+  <rect width="1280" height="1080" rx="24" fill="url(#bg)"/>
+  <text x="40" y="52" class="title">一次下周股票研究，怎样交给三个 Skill Agent</text>
+  <text x="40" y="86" class="note">任务参数与数据计算由程序确定；Agent 使用 Skill 解释证据、提出反证、审查结论。</text>
+  <rect x="40" y="115" width="1200" height="125" rx="16" class="box"/>
+  <text x="62" y="150" class="step">01 · 确定任务</text>
+  <text x="62" y="187" class="label">CLI：argparse</text>
+  <text x="62" y="216" class="body">--mode live --ticker GOOGL</text>
+  <text x="530" y="187" class="label">Web：parse_prompt()</text>
+  <text x="530" y="216" class="body">mode=live ticker=GOOGL</text>
+  <text x="1012" y="185" class="code">无需路由模型</text>
+  <text x="1012" y="216" class="note">先校验，再准备证据</text>
+  <path d="M640 240 V280" class="flow"/>
+  <rect x="40" y="290" width="1200" height="135" rx="16" class="box"/>
+  <text x="62" y="325" class="step">02 · 准备证据与执行能力</text>
+  <text x="62" y="365" class="label">Python bundle</text>
+  <text x="62" y="397" class="body">完整日线 · 预计算指标 · RSS 标题 · 来源编号</text>
+  <path d="M660 370 H720" class="flow"/>
+  <text x="750" y="365" class="code">read_evidence(section)</text>
+  <text x="750" y="397" class="code">calculate_indicators()</text>
+  <text x="40" y="465" class="note">03 · 先检查并筛选 Skill，再构造 Workflow；三个角色按下面顺序执行，均可按需调用证据工具。</text>
+  <rect x="40" y="495" width="360" height="205" rx="16" class="box"/>
+  <text x="62" y="533" class="label">① technical · 技术分析师</text>
+  <text x="62" y="573" class="code">data-quality</text>
+  <text x="62" y="604" class="code">technical-trend</text>
+  <text x="62" y="646" class="body">检查质量，解释趋势与反证</text>
+  <text x="62" y="678" class="note">输出 Analysis</text>
+  <path d="M405 588 H450" class="flow"/>
+  <rect x="460" y="495" width="360" height="205" rx="16" class="box"/>
+  <text x="482" y="533" class="label">② catalyst · 事件分析师</text>
+  <text x="482" y="573" class="code">news-catalyst</text>
+  <text x="482" y="615" class="body">区分事实、推断与未确认信息</text>
+  <text x="482" y="646" class="body">保留新闻来源与缺失项</text>
+  <text x="482" y="678" class="note">输出 Analysis</text>
+  <path d="M825 588 H870" class="flow"/>
+  <rect x="880" y="495" width="360" height="205" rx="16" class="box"/>
+  <text x="902" y="533" class="label">③ review · 风险审查员</text>
+  <text x="902" y="573" class="code">risk-review + decision-report</text>
+  <text x="902" y="615" class="body">指令读取前两份 State 分析</text>
+  <text x="902" y="646" class="body">审查冲突、信心与失效条件</text>
+  <text x="902" y="678" class="note">输出 Decision</text>
+  <path d="M220 700 V745" class="flow"/>
+  <path d="M640 700 V745" class="flow"/>
+  <path d="M1060 700 V745" class="flow"/>
+  <rect x="40" y="755" width="1200" height="135" rx="16" class="state"/>
+  <text x="62" y="790" class="label">Session State · output_key 保存各角色的最终输出</text>
+  <text x="62" y="828" class="code">technical: Analysis</text>
+  <text x="482" y="828" class="code">catalyst: Analysis</text>
+  <text x="902" y="828" class="code">review: Decision</text>
+  <text x="62" y="865" class="note">初始还含 ticker、as_of；Review 模板读取 {technical} / {catalyst}。原始证据保留在 Python bundle。</text>
+  <path d="M640 890 V930" class="flow"/>
+  <rect x="40" y="940" width="1200" height="100" rx="16" class="box"/>
+  <text x="62" y="980" class="label">04 · validate_decision() → 报告与执行记录</text>
+  <text x="62" y="1015" class="body">Python 校验引用、执行数据质量规则；保存 report.md、decision.json、evidence 与 Trace。</text>
+</svg>

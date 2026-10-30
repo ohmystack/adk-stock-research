@@ -25,6 +25,10 @@ Google ADK、Google Gen AI SDK、yfinance、exchange-calendars 等依赖各自�
 ## Primary references
 
 - [ADK Skills](https://adk.dev/skills/)
+- [ADK 2.13.0 Gemini adapter source](https://github.com/google/adk-python/blob/v2.13.0/src/google/adk/models/google_llm.py)
+- [Google Cloud Agent Registry: setup](https://docs.cloud.google.com/agent-registry/setup)
+- [Google Cloud Agent Registry: register skills](https://docs.cloud.google.com/agent-registry/register-skills)
+- [Google Cloud Agent Registry: manage skill revisions](https://docs.cloud.google.com/agent-registry/manage-skill-revisions)
 - [ADK 2.10 release: discovery / lifecycle](https://github.com/google/adk-python/releases/tag/v2.10.0)
 - [ADK 2.12 release: script artifacts](https://github.com/google/adk-python/releases/tag/v2.12.0)
 - [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing)

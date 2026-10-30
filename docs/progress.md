@@ -1,6 +1,6 @@
 # 项目进度
 
-更新：2026-10-30（Asia/Shanghai）。当前交付以包含本文档的 main 提交为准；历史设计和本地绝对路径不作为新设备运行前提。
+更新：2026-10-31（Asia/Shanghai）。当前交付以包含本文档的 main 提交为准；历史设计和本地绝对路径不作为新设备运行前提。
 
 ## 目标与决定
 
@@ -21,12 +21,35 @@
 | CLI／Web | 两种入口共用运行流程、预算账本、锁与留档；Web prompt 路由不调用额外模型，原生 Trace 可查看三个角色 |
 | Discovery／生命周期 | EAGER／LAZY；bounded 淘汰、ephemeral 过期、显式卸载与指令替换机制实验 |
 | 第三方与脚本 | 固定 Position Sizer 原件和 MIT 许可；ADK 适配版脚本／Artifact 读回；npx 安装再导入流程 |
-| Registry | 五个已检查方法的本地关键词 search → load，无向量库与托管服务 |
+| Registry | 五个已检查方法的本地关键词 search → load；补充 GCPSkillRegistry／Google Cloud Agent Registry 接入说明，未连接托管服务 |
 | 执行追溯 | report、decision、evidence、trace、requests、usage；失败留档、方法哈希与共享预算 |
-| 正文与图片 | 入门介绍、代码／配置／State、全部实验 CLI 与 UI prompt；官方 PNG、一组三张真实 Trace PNG，来源和许可证齐全 |
+| 正文与图片 | 任务设计与方法分工、工具／代码／运行／Trace 请求闭环、参数归属、全部实验入口；重画架构 SVG、新增请求循环 SVG，保留三张真实 Trace PNG |
 | 跨设备材料 | AGENTS.md 保存约定；本文记录状态、验证证据、待办与恢复步骤 |
 
-## 本次修改
+## 本次修改（2026-10-31）
+
+### 演讲主线重排
+
+1. README 标题改为“使用 Google ADK Skills 构建股票研究多 Agent 系统”；按概念 → 任务设计与分工 → 环境 → 函数／Tool 与预检 → Agent／Workflow／Runner → 运行 → Trace → 参数机制 → Registry → 方法改造与扩展 → 成本排错重排。
+2. 展开股票研究输入与输出契约：CLI argparse 直取 ticker，Web 正则解析显式参数，Python 负责取证据、算指标与目标交易周；五个 Skill 的职责、正文原文节选和调用顺序单独展示。
+3. 区分应用函数、两个业务 Tool 与 ADK Skill Tool；补齐角色指令、schema、State、三角色 Agent、顺序 Workflow 与 Runner／Web 当前 invocation 的接线。
+4. 将 Trace 独立成章，按加载前后 Request、Skill 工具返回、动态工具、模型 Response、Review State 注入与最终校验讲解；定位 ADK 请求处理器和 Gemini SDK 出站／返回位置，明确 requests.json 仅为摘要。
+5. 新增参数归属表，区分 Skill frontmatter／metadata、SkillToolset、SkillLifecycleConfig、LlmAgent、Workflow／RunConfig、项目 YAML、环境变量与 Web 服务参数。
+6. Registry 分为项目自定义 LocalRegistry 与 Google Cloud 接法，核对 ADK 2.13.0 的 GCPSkillRegistry、Agent Registry API、ADC／权限与默认 revision；仅介绍，不配置或接入云服务。
+7. 重画 architecture.svg，新增 request-pipeline.svg；两图均实际渲染并检查。补充 Cloud Shell 的 --allow_origins 命令，同步 AGENTS、INSTRUCTOR 与引用来源。
+
+### 本日此前修改
+
+1. README 第 05 节补充 Discovery 的请求处理代码与共用工具调用辅助函数，说明准备请求、读取目录和真正调用模型的区别。
+2. 第 06 节补充生命周期配置、load／unload、invocation 切换与状态观察代码，与原有激活列表、工具变化和历史正文替换说明对应。
+3. 第 08 节补充 Position Sizer 的适配与脚本执行接线、Artifact 保存与读回、LocalRegistry 接口及 search → load 调用，保留五个 lab 的 CLI／Web 入口。
+4. 摘录只保留功能配置、关键调用与结果解释；共用上下文与调用辅助函数集中说明，省略重复准备代码。本次未修改运行实现。
+5. 按用户要求修复本机虚拟环境的 macOS 隔离标记问题，恢复 PyYAML／pydantic_core 原生扩展加载，并完成全量回归。
+6. 按读者的理解与操作顺序通读并优化 README 全文：区分 Skill 文件夹、名称与描述列表、方法正文，补充 Session／State／invocation 等概念，展开预检范围、配置优先级与实验观察步骤。
+7. 重写 Discovery 上下文开销和生命周期表格，说明同一会话中的执行轮次、每个 Agent 的 BOUNDED 数量限制、淘汰顺序，以及卸载对后续请求和已保存结果的不同影响。
+8. 补全固定证据对照、最终报告与中间输出的区别、第三方导入与脚本执行条件、Artifact 保存及读回、预算计次和排错步骤；保留核心代码摘录与五组实验入口。
+
+## 上次修改（2026-10-30）
 
 1. 将“核心代码与配置”前移到环境准备之后，所有实际研究和机制运行均在代码介绍之后。
 2. 将 Web UI 启动移至运行章节，先统一介绍 CLI／Web 两种入口，再执行首次报告。
@@ -36,7 +59,17 @@
 
 ## 验证与代码检查
 
-### 本次复核
+### 本次复核（2026-10-31）
+
+- 本轮重排后，README 的 65 个代码围栏闭合，26 段 Python、20 段 Bash、2 段 JSON 与 2 段 YAML 通过语法／解析检查；七份 Markdown 的本地链接、锚点与表格结构通过检查，五段 Skill 引文与源文件逐字匹配，五组 lab 均保留 CLI／UI 入口。
+- 两张 SVG 通过 XML 解析与 PNG 渲染目视检查；本地 ADK 2.13.0 的参数默认值、GCPSkillRegistry 签名、Web --allow_origins 的 regex 支持已核对。doctor 五个 Skill 均 SUPPORTED；offline-check 显示 model_called=false，三角色构造通过。未重跑模型或云端服务，详细记录见 VALIDATION.md 的“演讲主线、Trace 与 Registry”。
+- README 全文可读性调整后，55 个代码围栏闭合；17 段 Python 的 AST、2 段 JSON 和 2 段 YAML 的解析值与本轮调整前一致，43 处本地链接、图片路径及锚点有效，五组 lab 的 CLI／Web 入口保留，`git diff --check` 通过。本轮只改文档，没有重跑模型或研究任务；详细记录见 VALIDATION.md 的“README 全文可读性复核”。
+- README 的 55 个代码围栏闭合；17 段 Python、2 段 JSON、2 段 YAML 通过语法／解析检查，42 处本地链接及锚点有效，五组 lab 的 CLI／Web 命令均保留。
+- 摘录和说明已与当前 labs.py、Skill 文件及本地 ADK 实现核对；`git diff --check` 通过。
+- 首轮定向测试因 macOS 拒绝加载 `pydantic_core` 扩展，在收集阶段退出；获授权在沙箱外重试仍失败。随后确认 `.venv` 携带 `sharingd` 隔离标记，相关扩展的代码签名及安装记录哈希检查通过；按用户要求备份并清除该虚拟环境的隔离属性，未改动全局安全设置。
+- 修复后 PyYAML 6.0.3 的 LibYAML 扩展、Pydantic 2.14.1／pydantic_core 2.50.1 均能正常导入；`.venv/bin/python -m pytest -q`：**28 passed，5 warnings**，包含五个 lab。`spctl --status` 仍为 `assessments enabled`，没有调用 Gemini。细节见 VALIDATION.md。
+
+### 上次复核（2026-10-30）
 
 - `.venv/bin/python -m pytest -q`：**28 passed**；覆盖 ADK 解析、指标与日历、降级与引用、原生机制实验、CLI／YAML 优先级，以及 CLI／Web 两种真实 Runner 路径。
 - Web 回归验证 State 交接、新 Session 隔离、调用上限失败留档、共享账本计次与锁清理；脚本化模型测试禁止 HTTP，不消耗 Gemini token。
