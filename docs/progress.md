@@ -23,10 +23,23 @@
 | 第三方与脚本 | 固定 Position Sizer 原件和 MIT 许可；ADK 适配版脚本／Artifact 读回；npx 安装再导入流程 |
 | Registry | 五个已检查方法的本地关键词 search → load；补充 GCPSkillRegistry／Google Cloud Agent Registry 接入说明，未连接托管服务 |
 | 执行追溯 | report、decision、evidence、trace、requests、usage；失败留档、方法哈希与共享预算 |
-| 正文与图片 | 任务设计与方法分工、工具／代码／运行／Trace 请求闭环、参数归属、全部实验入口；重画架构 SVG、新增请求循环 SVG，保留三张真实 Trace PNG |
+| 正文与图片 | 任务设计与方法分工、工具／代码／运行、Web UI 请求查看、Discovery 对照与扩展实验；详细参数和生命周期在实现参考，四张截图标注 SVG 保留原始 PNG 内容 |
 | 跨设备材料 | AGENTS.md 保存约定；本文记录状态、验证证据、待办与恢复步骤 |
 
 ## 本次修改（2026-10-31）
+
+### README 精简与 Web UI 操作指引
+
+- 第 04 节先说明 ADK 加载 Skill 后仍需应用提供工具、数据和执行环境，再介绍可复用的兼容性检查与加载筛选；`offline-check` 删除实现摘录，只保留检查范围和不调用模型的说明。
+- 第 07 节改为 Traces → 模型调用 → Event ID → Request／Response 的界面操作，删除正文中的 ADK 源码定位与 SDK 调用；用简表和加载前后对比说明应观察的内容。
+- 第 08 节只讲 Discovery，保留无模型机制实验与 EAGER／LAZY 真实研究的 CLI／Web 入口；参数归属、生命周期、工具调用辅助函数和 SDK 边界移入 implementation.md，修正交叉引用。
+- 四张标注 SVG 嵌入原始真实 PNG，裁剪显示范围并叠加红圈与编号，逐张渲染检查；未改写截图内容，也未新增 Gemini 调用。同步讲师说明、开发约定与图片来源。
+
+### 为什么使用 ADK
+
+- README 第 01 节在 ADK 定义后补充与 Codex／Claude Code + Skills 的选择说明：个人任务可直接使用现成 Agent；构建应用时，需要明确控制流程、数据传递、业务规则和运行追踪。
+- 用现有三角色工作流、证据校验、合成数据 HOLD 与 CLI／Web Trace 解释框架价值；区分 ADK 通用基础设施与项目实现的业务约束，保留 Codex SDK／Claude Agent SDK 也可构建应用的边界及官方来源。
+- 本轮仅修改文档；验证事实见 VALIDATION.md 的“为什么使用 ADK”。
 
 ### 演讲主线重排
 
@@ -61,6 +74,7 @@
 
 ### 本次复核（2026-10-31）
 
+- README 精简后，第 07 节无源码片段，第 08 节集中于 Discovery；七份 Markdown 的链接、锚点、围栏、表格与代码摘录检查通过。四张标注 SVG 的嵌入 PNG 与原始文件逐字节一致，均已渲染目视检查；详见 VALIDATION.md 的“README 精简与截图指引”。
 - 本轮重排后，README 的 65 个代码围栏闭合，26 段 Python、20 段 Bash、2 段 JSON 与 2 段 YAML 通过语法／解析检查；七份 Markdown 的本地链接、锚点与表格结构通过检查，五段 Skill 引文与源文件逐字匹配，五组 lab 均保留 CLI／UI 入口。
 - 两张 SVG 通过 XML 解析与 PNG 渲染目视检查；本地 ADK 2.13.0 的参数默认值、GCPSkillRegistry 签名、Web --allow_origins 的 regex 支持已核对。doctor 五个 Skill 均 SUPPORTED；offline-check 显示 model_called=false，三角色构造通过。未重跑模型或云端服务，详细记录见 VALIDATION.md 的“演讲主线、Trace 与 Registry”。
 - README 全文可读性调整后，55 个代码围栏闭合；17 段 Python 的 AST、2 段 JSON 和 2 段 YAML 的解析值与本轮调整前一致，43 处本地链接、图片路径及锚点有效，五组 lab 的 CLI／Web 入口保留，`git diff --check` 通过。本轮只改文档，没有重跑模型或研究任务；详细记录见 VALIDATION.md 的“README 全文可读性复核”。

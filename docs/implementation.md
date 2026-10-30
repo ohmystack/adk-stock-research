@@ -354,3 +354,200 @@ if missing:
 | 可追溯记录 | 保存证据快照、Skill 哈希、请求中的工具、调用响应与用量 | 能解释“改了什么”和“模型实际做了什么” |
 
 这些检查服务于可运行、可解释的 Agent 系统。若要用于长期服务，还应按自己的部署补充持久化会话、真实权限、脚本隔离和更完整的兼容性规则。
+
+<a id="skill-configuration"></a>
+
+## Skill 配置参考
+
+以下按配置对象列出参数，供调整应用时查阅。
+
+| 配在哪里 | 参数 | 控制什么 | 本项目怎样使用 |
+| --- | --- | --- | --- |
+| 单个 `SKILL.md` 的 frontmatter | `name`、`description` | 该 Skill 的名称与发现信息 | 五个核心方法各自声明 |
+| 单个 Skill 的 `metadata` | `adk_additional_tools` | 该 Skill 激活后需要开放的宿主工具名称 | `technical-trend` 申请两个业务工具 |
+| 单个 Skill 的 `metadata` | `adk_inject_state` | 加载正文时是否替换 `{state_key}` | `data-quality` 注入 `ticker`、`as_of` |
+| `SkillToolset(...)` | `skills`、`additional_tools` | 当前角色的方法对象、宿主提供的真实工具实现 | 每个角色分别配置 |
+| `SkillToolset(...)` | `discovery_mode` | 本地方法名称与描述何时披露 | 项目默认 EAGER；ADK 默认 LAZY |
+| `SkillToolset(...)` | `registry` | 通过搜索／按名称获取 Skill 的来源 | 第 09 节本地实验与云端接法 |
+| `SkillToolset(...)` | `code_executor`、`save_output_artifacts` | 脚本执行及输出文件保存 | 仅脚本 lab 显式配置 |
+| `SkillLifecycleConfig(...)`，作为 Toolset 的 `lifecycle_config` | `default_mode`、`max_active_skills`、`skill_overrides` | 默认生命周期、BOUNDED 数量上限、指定 Skill 的模式覆盖 | 主团队 BOUNDED、每角色 2 个；lab 演示覆盖 |
+| `LlmAgent(...)` | `instruction`、`tools`、`output_schema`、`output_key` | 角色职责、工具入口、输出结构、结果写入哪个 State 键 | 三个角色各自配置 |
+| `LlmAgent(generate_content_config=...)` | `max_output_tokens`、`temperature`、`thinking_config` | Gemini 生成行为 | Python 中设置输出上限 4096、温度 0.2、thinking 为 low |
+| `Workflow(...)` / `RunConfig(...)` | `timeout` / `max_llm_calls` | 工作流超时／一次运行的模型调用上限 | 180 秒／YAML 的上限；项目回调再做团队共享计数 |
+| `config/workshop.yaml` | `roles`、`model`、`discovery`、预算项 | 项目应用设置，经 Python 转为上述对象 | 应用自定义 YAML |
+| 环境变量 | `ADK_ENABLE_SKILL_LIFECYCLE=1` | ADK 生命周期功能开关 | `environment()` 在启动时设置 |
+| `adk web` 命令行 | `--allow_origins` | Web 服务允许的跨来源访问 | Cloud Shell 启动命令传入来源正则 |
+
+### 同样写“工具”，两处配置的值不同
+
+单个 Skill 在 [technical-trend/SKILL.md](../skills/technical-trend/SKILL.md) 中声明需要什么：
+
+```yaml
+name: technical-trend
+description: Analyze stock price trend using deterministic technical indicators.
+metadata:
+  adk_additional_tools: ["calculate_indicators", "read_evidence"]
+```
+
+这段位于 `SKILL.md` 开头的 `---` 区块内，值是**工具名称字符串**。Toolset 中 `additional_tools=[read_evidence, calculate_indicators]` 的值则是**实际 Python 函数**。名称必须匹配；只改 Skill 文件不会创建新工具。
+
+`data-quality` 另外声明 `metadata.adk_inject_state: true`，使正文中的 `{ticker}`、`{as_of}` 在 `load_skill` 时替换成 State 快照。Review 的 `{technical}`／`{catalyst}` 位于 `LlmAgent.instruction`，是在准备角色指令时替换。两者的配置位置与生效时机不同。
+
+### 应用参数怎样传到 ADK
+
+- 模型优先读取环境变量 `GEMINI_MODEL`，其次是 YAML 的 `model`；当前代码只接受 `gemini-3.8-flash`，更换前需同步调整模型限制与费用估算。
+- 发现模式优先读取 CLI 的 `--discovery` 或 Web 的 `discovery=`，其次是 YAML 的 `discovery`，再传给 `SkillToolset(discovery_mode=...)`。
+- YAML 的 `roles` 转为每角色的 `skills=[...]`；保留 `technical → catalyst → review` 的名称与顺序，Review 模板依赖前两份输出。
+- YAML 的 `max_model_calls` 默认 16；CLI `--max-calls` 可以调低，不能调高。三个角色共享此上限，工具返回后再次调用模型也计入。
+
+<a id="lab-helpers"></a>
+
+### 机制实验的工具调用辅助函数
+
+以下约定用于 `stock_research/labs.py` 的代码摘录；各实验由程序控制，不调用模型。
+
+摘录中的 `skills` 是 `accepted_skills()` 返回的 Skill 字典，以名称为键；`result` 是保存实验输出的字典。`ctx` 是 ADK 的工具上下文（`ToolContext`），提供当前会话、执行轮次和 State 等信息。项目用 `context()` 辅助函数为实验创建它。另一个辅助函数 `call()` 按名称从 `SkillToolset` 中找到工具并执行：
+
+```python
+async def call(ts, ctx, tool_name, args):
+    tool = next(t for t in await ts.get_tools(ctx) if t.name == tool_name)
+    return await tool.run_async(args=args, tool_context=ctx)
+```
+
+这里的 `await` 表示等待异步操作完成。每次调用哪个工具、传入什么参数，都由实验代码指定。
+
+<a id="skill-lifecycle"></a>
+
+### 生命周期：方法加载后保持多久
+
+生命周期配置决定 Skill 加载后保持激活的时间，以及何时自动失效或需要手动卸载。它管理每个 Agent 当前激活的 Skill，以及这些 Skill 为模型提供的方法正文和额外工具；已经保存的分析结论、报告和生成文件会继续保留。
+
+先区分两个范围：**会话（Session）**可以包含多轮交互；**一轮执行（invocation）**指从收到一条用户消息到处理完成的全过程，其中可以包含多次模型请求和工具调用。以下表格中的“下一轮”，指在同一会话中处理下一条消息。本项目的完整研究每次都使用新会话；后面的机制实验会用代码模拟同一会话状态延续到下一轮的情况。
+
+![Skill 的加载、淘汰、临时有效与卸载](images/lifecycle.svg)
+
+| 模式 | 加载后保持多久 | 是否受 `max_active_skills` 数量上限约束 |
+| --- | --- | --- |
+| PERSISTENT（持续有效） | 在当前会话中保持激活，直到调用 `unload_skill` 卸载 | 否；也不会因其他 Skill 超过上限而被淘汰 |
+| BOUNDED（数量受限） | 在当前会话中保持激活；超出上限时，按最近一次加载的先后顺序，先淘汰较早加载的 BOUNDED Skill | 是；每个 Agent 分别计算 |
+| EPHEMERAL（本轮有效） | 在加载它的这一轮执行中持续有效；同一会话开始下一轮执行时失效，需要时可重新加载 | 否；不会挤占 BOUNDED Skill 的数量名额 |
+
+ADK 的默认模式是 PERSISTENT，默认 BOUNDED 上限为 5。本项目通过 `ADK_ENABLE_SKILL_LIFECYCLE=1` 开启生命周期功能，并将研究团队配置为 BOUNDED、上限 2：每个 Agent 最多同时激活两个 BOUNDED Skill。PERSISTENT 和 EPHEMERAL 不计入这个上限，各 Agent 的数量也互不影响。
+
+再次调用 `load_skill` 加载已激活的 BOUNDED Skill，会把它移到最近加载的位置。例如上限为 2，依次加载 A、B、再次加载 A、加载 C，最终淘汰的是 B。
+
+下面的机制实验把上限改为 1，便于观察第二个 BOUNDED Skill 加载后，第一个如何被淘汰。
+
+`default_mode`、`max_active_skills`、`skill_overrides` 写在 `SkillLifecycleConfig` 中，再通过 `SkillToolset(lifecycle_config=...)` 传入：
+
+```python
+ts = SkillToolset(
+    skills=variants,
+    additional_tools=[risk_probe, report_probe],
+    lifecycle_config=SkillLifecycleConfig(
+        default_mode=SkillLifecycleMode.BOUNDED,
+        max_active_skills=1,
+        skill_overrides={"lab-glossary": SkillLifecycleMode.EPHEMERAL},
+    ),
+)
+```
+
+`variants` 包含实验在内存中创建的三个演示 Skill。`lab-risk` 和 `lab-glossary` 都在 `metadata.adk_additional_tools` 中声明需要 `risk_probe`，`lab-report` 则声明需要 `report_probe`。两个 probe 是只返回文字的 Python 函数，用来观察模型可调用的工具列表如何随 Skill 激活状态变化。
+
+配置中的 `additional_tools` 提供工具实现；激活哪个 Skill，就向模型提供该 Skill 声明需要的工具。`skill_overrides` 单独把 `lab-glossary` 设为 EPHEMERAL，其他两个沿用默认的 BOUNDED。
+
+实验先在第一轮中依次加载三个 Skill，再模拟进入第二轮，最后手动卸载仍激活的方法：
+
+```python
+ctx = await context(agent, "turn-1")
+await call(ts, ctx, "load_skill", {"skill_name": "lab-risk"})
+await call(ts, ctx, "load_skill", {"skill_name": "lab-report"})  # 超过上限，淘汰 lab-risk
+await call(ts, ctx, "load_skill", {"skill_name": "lab-glossary"})
+
+# 将 State 传给新的工具上下文，用不同的执行轮次编号模拟下一轮
+ctx2 = await context(agent, "turn-2", ctx.state.to_dict())
+active = ts.list_active_skills(ctx2)  # lab-glossary 已失效，只剩 lab-report
+await call(ts, ctx2, "unload_skill", {"skill_name": "lab-report"})
+```
+
+实验在每一步用 `ts.list_active_skills(ctx)` 查看当前激活的 Skill，用 `await ts.get_tools(ctx)` 查看模型此时可以调用的工具。示例中的 `"turn-1"`、`"turn-2"` 是传给 `context()` 的执行轮次编号。该辅助函数为第二轮创建新的上下文，并传入上一轮的 State，从而模拟状态保留、执行轮次变化的情况。
+
+**Web UI prompt**：
+
+```text
+lab lifecycle
+```
+
+**CLI**：
+
+```bash
+.venv/bin/python -m stock_research.cli lab lifecycle
+```
+
+在对话结果或 `runs/lab-lifecycle.json` 中核对：
+
+| 步骤 | 激活列表 | 工具变化 |
+| --- | --- | --- |
+| 第一轮：加载 `lab-risk` | `lab-risk` | 出现 `risk_probe` |
+| 第一轮：加载 `lab-report` | `lab-report` | `lab-risk` 被淘汰，`risk_probe` 消失，出现 `report_probe` |
+| 第一轮：加载 `lab-glossary` | `lab-report`、`lab-glossary` | 再次出现 `risk_probe`；EPHEMERAL 不占 BOUNDED 名额，所以 `lab-report` 保留 |
+| 开始第二轮执行 | `lab-report` | `lab-glossary` 失效，`risk_probe` 消失，`report_probe` 保留 |
+| 手动卸载 `lab-report` | 无激活 Skill | `report_probe` 消失 |
+
+这里的“工具消失”指该工具从后续模型请求的可调用工具列表中移除；`load_skill` 等基础工具仍然可用。如果另一个激活的 Skill 也声明了同一个工具，这个工具仍会保留。
+
+实验还检查卸载对方法正文的影响：构造一个保留旧 `load_skill` 返回内容的模型请求，再调用 `ts.process_llm_request(...)`。输出中的 `pruned_history` 应包含 `"skill_name": "lab-risk"`、`"status": "unloaded"` 等字段，表示请求历史中的这份方法正文已替换为简短的卸载通知。
+
+这个替换发生在准备后续模型请求时，不会删除会话中保存的原始执行事件，也不会清空已读取的参考资料、其他工具返回结果或分析结论。Skill 卸载后仍可被发现，并可再次加载。
+
+整个实验由代码控制，**不调用 Gemini**。Web 对话结果会显示上述完整状态序列；Trace 只记录实验入口节点，详细步骤请看对话结果或 JSON 文件。EPHEMERAL 的有效范围覆盖整轮执行中的所有模型和工具调用。
+
+修改 Skill 文件后，需要新建研究会话，让应用重新检查文件并构造 Skill。本项目没有开启运行过程中的自动重验证，正在执行的任务不会自动采用文件改动。
+
+## Gemini 请求加工与 SDK 调用边界
+
+![请求组装、Gemini 返回与工具调用循环](images/request-pipeline.svg)
+
+下面是已安装 ADK 包中与本次请求有关的源码入口，路径从 `google/adk/` 开始。它们用于定位加工环节，具体函数与内部文件可能随 ADK 版本变化：
+
+| 加工环节 | ADK 2.13.0 源码入口 | 作用 |
+| --- | --- | --- |
+| 创建每个模型步骤 | `flows/llm_flows/base_llm_flow.py` · `_run_one_step_async()` | 创建并准备 `LlmRequest` |
+| 基础配置与角色指令 | `flows/llm_flows/basic.py`；`prompt/_instructions.py` | 写入模型配置、角色指令，替换 State 模板 |
+| 消息历史与 schema | `flows/llm_flows/context/_contents.py`；`prompt/_schema.py` | 填入消息／工具结果，加入结构化输出要求 |
+| Skill 指南、目录与正文 | `tools/skill_toolset.py` · `process_llm_request()`、`LoadSkillTool.run_async()` | 准备 Skill 系统说明；加载正文、注入 State、记录激活状态 |
+| 本步动态工具 | `tools/skill_toolset.py` · `get_tools()`；`flows/llm_flows/tools/_agent_tools.py` | 按激活状态解析工具，并生成函数声明 |
+| 调用模型与处理返回 | `flows/llm_flows/core/_model_call.py` → `models/google_llm.py` · `Gemini.generate_content_async()` | 请求交给 Google Gen AI SDK；返回转换为 `LlmResponse` |
+
+其中 `prompt/` 在表内均指 `flows/llm_flows/prompt/`。如果要在本机定位最终模型适配器：
+
+```bash
+.venv/bin/python - <<'PY'
+import inspect
+from google.adk.models.google_llm import Gemini
+print(inspect.getsourcefile(Gemini))
+PY
+```
+
+打开输出的文件，找到 `generate_content_async()`，也可查看 [ADK 2.13.0 的 Gemini 适配器源码](https://github.com/google/adk-python/blob/v2.13.0/src/google/adk/models/google_llm.py)。当前非流式路径的核心调用可简化为下面这样，省略 instrumentation 包装、重试及适配逻辑：
+
+```python
+response = await api_models.generate_content(
+    model=model,
+    contents=llm_request.contents,
+    config=llm_request.config,
+)
+llm_response = LlmResponse.create(response)
+```
+
+这里的 `api_models` 来自 Google Gen AI SDK 的异步模型客户端。SDK 收到的核心输入是 `model`、`contents` 和 `config`；Skill 没有独立的模型调用通道。模型适配器在调用前还会处理请求兼容性与 HTTP 配置，返回后由 ADK 转成事件，继续工具循环或完成角色输出。
+
+需要区分三种可观察内容：
+
+| 在哪里看 | 保存了什么 | 用来回答什么问题 |
+| --- | --- | --- |
+| 本项目 `requests.json` | `before_model_callback` 保存的 Agent 名、工具名称、系统说明 | 本次有哪些工具？EAGER 目录或 Review 模板是否已进入系统说明？ |
+| Web **Request / Response** 与 span **Attributes** | ADK 采集的模型请求／响应追踪表示；Request 界面规范化显示 `system_instruction`、`user_messages` | 正文和证据怎样进入上下文？模型返回了什么调用或文本？ |
+| `Gemini.generate_content_async()` 中的 SDK 调用 | 真正交给 Google Gen AI SDK 的 `model / contents / config` 与返回 | 最终在哪个代码边界发给 Gemini、在哪里接回结果？ |
+
+`requests.json` 是摘要，没有完整消息历史、函数 schema 或模型返回。Web Trace 也经过格式化与敏感字段清理，不是原始 HTTP 报文。当前 span Attributes 中可找 `gcp.vertex.agent.llm_request`、`gcp.vertex.agent.llm_response`；这些是 ADK 沿用的追踪字段名，本项目仍使用 Gemini Developer API。

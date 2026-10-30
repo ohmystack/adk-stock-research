@@ -1,6 +1,6 @@
 # 讲师备忘 · 100 分钟
 
-主屏使用 [README.md](README.md)。正文顺序为 ADK／Skill → 股票研究任务设计与角色分工 → 环境 → 函数／Tool 与预检 → Agent／Workflow／Runner → CLI／Web 运行 → Trace 中的请求与返回 → 参数归属与机制 → Registry → 方法改造与扩展。详细接线和检查规则保留在[实现参考](docs/implementation.md)。
+主屏使用 [README.md](README.md)。正文顺序为 ADK／Skill → 股票研究任务设计与角色分工 → 环境 → 函数／Tool 与预检 → Agent／Workflow／Runner → CLI／Web 运行 → Web UI 查看请求与返回 → Discovery → Registry → 方法改造与扩展。参数归属、生命周期和详细接线保留在[实现参考](docs/implementation.md)。
 
 ## 会前
 
@@ -19,10 +19,10 @@
 | 00–10 分钟 | ADK／Skill；ticker 输入、研究规格、三个角色与五个方法 | 对齐程序计算、模型判断与调用顺序 |
 | 10–13 分钟 | 环境安装与 Key 配置 | 确认实验前提，不在此启动 UI |
 | 13–23 分钟 | 业务 Tool、预检、Toolset／Agent／Workflow／Runner、State | 从设计对应到代码与运行入口 |
-| 23–35 分钟 | CLI／Web、首次研究、Trace 的 Request／Response、SDK 边界 | 看清 Skill 加载前后、动态工具与模型返回 |
-| 35–40 分钟 | 参数归属、EAGER／LAZY、生命周期与 Registry 接法 | 明确改哪里、观察什么 |
+| 23–35 分钟 | CLI／Web、首次研究、在界面打开 Request／Response | 看清 Skill 加载前后的请求、模型返回与工具结果 |
+| 35–40 分钟 | EAGER／LAZY 对照与 Registry 接法 | 明确目录披露和按需搜索的区别 |
 | 40–55 分钟 | 环境与首次研究 | 每组一份报告 |
-| 55–65 分钟 | Discovery、生命周期实验 | 状态变化记录 |
+| 55–65 分钟 | Discovery 对照；有余力再做附录中的生命周期实验 | 请求差异与调用记录 |
 | 65–90 分钟 | 修改 Skill、固定输入对照 | 改动与执行证据 |
 | 90–100 分钟 | 整理产物 | 报告、差异、关键截图 |
 
@@ -34,7 +34,7 @@
 - doctor 是诊断报告，零退出码不代表所有方法可用；Key 存在不等于 API 验证。
 - scan 逐个检查候选并保留理由，accepted_skills 才真正过滤加载；必需方法缺失时拒绝运行。
 - offline-check 真正构造 ADK 团队但不调用模型，将数据／接线错误与模型执行错误分开。
-- 结合 README 中的核心摘录、State 图与配置表讲复用入口，不到实验结尾再讲代码。
+- 结合 README 中的核心摘录和 State 图讲复用入口；参数表与生命周期细节按需查附录。
 - 预检详表供实验时查阅；现场以 scan → accepted_skills → build_team 的筛选路径串起各检查，再进入 Agent／Workflow／Runner。
 
 ## UI 演示顺序
@@ -47,14 +47,14 @@
 
 1. 在最终 Markdown 报告中确认 fixture、HOLD、unknown、low；不要将前一条 review 的原始 JSON 误当成程序校验后的交付报告。
 2. 切到 Traces，展开 research_team，按时间查看 technical → catalyst → review 三个同级角色，观察模型和工具 span 的顺序与耗时。
-3. 选择 technical 首次模型 span，点击 Event ID，再选 Request。先看角色指令、ADK 指南、EAGER 目录与初始工具；再查看 load_skill 的参数和返回。
+3. 按红圈指引选择 technical 首次 generate_content 记录，点击 Event ID，再选 Request，查看角色指令与 EAGER 目录。
 4. 打开加载后的模型 Request，展开 user_messages 的 parts，找到 type: tool_call_response 的项，查看 response.instructions 中的正文与 ticker／as_of 注入；比较动态工具声明。
 5. 在模型 Response 找 type: tool_call，再到 Events 看 function_response，核对模型提议的调用与 Python 返回。查看 Review 的首次 Request，确认两份分析已填入指令。
-6. 指向 README 中 Gemini.generate_content_async 的 SDK 调用。区分项目 requests.json 摘要、Web 追踪表示和 SDK 的 model／contents／config；请求加工图只解释流程，不是运行截图。
+6. 回到最终 Markdown 报告，并指出 runs/ 中保存的报告与执行记录；requests.json 只保留工具名和系统说明摘要。
 7. 新 Session 发送同一任务的 `discovery=lazy` 版本，找到各角色的 list_skills → load_skill；比较 requests 和 usage。
 8. 新 Session 发送 README 的 live GOOGL prompt，核对真实来源、截至时间、目标交易周和标题证据降级。
 
-正文仅保留三张真实截图：Workflow 耗时、加载后的请求内容、LAZY 目录调用；其他运行现场查看即可。
+正文用真实截图的裁剪标注版展示 Trace 入口、Event ID、Request／Response 按钮和 LAZY 目录调用；红圈只标操作位置。
 
 以下机制 prompt 可在 UI 直接发送，不调用 Gemini：
 
@@ -66,7 +66,7 @@ lab artifacts
 lab registry
 ```
 
-每行独立发送。lab 输出由代码控制真实 ADK 工具操作，Trace 只有入口节点；不能把 JSON 中的状态序列称作模型自主决策。CLI 等价命令均在 README 对应步骤保留。
+每行独立发送。lab 输出由代码控制真实 ADK 工具操作，Trace 只有入口节点；不能把 JSON 中的状态序列称作模型自主决策。生命周期实验的 CLI／Web 入口在实现参考中，其他入口在 README 对应步骤保留。
 
 ## 方法改造
 

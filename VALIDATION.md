@@ -131,3 +131,17 @@ Cloud Shell／Web Preview 仍未验证。所有截图均为合成输入；本轮
 - 已用本地 API 签名确认 GCPSkillRegistry 的 project_id／location／credentials 参数，SkillToolset 默认 LAZY，SkillLifecycleConfig 默认 PERSISTENT、BOUNDED 上限 5。Google Cloud Agent Registry 的注册、ADC、角色、版本和下载说明已查阅官方文档；没有启用 API、创建资源或接入云 Registry。
 - `adk web --help` 与本地 CORS 实现确认 --allow_origins 支持 regex 前缀；README 与讲师备忘补充用户指定的 Cloud Shell 命令。Cloud Shell／Web Preview 端到端仍未验证。
 - `git diff --check` 通过。本轮只更新文档与 SVG，未调用 Gemini，未重复全量代码回归；此前 28 passed 的运行事实保留在本文件上方。
+
+## 2026-10-31 · 为什么使用 ADK
+
+- README 第 01 节新增 Codex／Claude Code + Skills 与 ADK 的选择说明，放在 ADK 定义之后、核心组件之前。三角色顺序、State 传递、证据校验、合成数据 HOLD 和预算规则已与 `stock_research/runtime.py` 核对。
+- 查阅 ADK Technical Overview、OpenAI 官方 Skills／Codex SDK 文档与 Anthropic Agent SDK 概览；保留现成 Agent 可直接运行合适 Skills、两种 SDK 也能构建应用的说明，未将业务校验和预算限制归为 ADK 自动提供的功能。
+- README 的 65 个代码围栏内容与本轮修改前逐字一致；新增概念说明顺序、Markdown 标题间距与围栏闭合检查通过，`git diff --check` 通过。
+- 本轮仅修改 README、进度和验证记录，未运行 pytest、Gemini 或行情抓取。
+
+## 2026-10-31 · README 精简与截图指引
+
+- 第 04 节突出 ADK 的 Skill 支持边界和可复用的应用检查；offline-check 删除代码摘录。第 07 节改为 Web UI 操作；第 08 节只保留 Discovery，详细配置、生命周期与 SDK 边界转入实现参考。同步讲师说明、开发约定、图片来源与相关链接。
+- 七份 Markdown 的本地链接、锚点、代码围栏和表格检查通过；Python 摘录通过 AST 解析，Bash 通过 bash -n，JSON／YAML 通过解析。五段 Skill 引文仍与源文件匹配，五个 lab 在主文档或实现参考中均保留 CLI／Web 入口。
+- 四张标注 SVG 通过 XML 解析和 sharp PNG 渲染，并逐张目视检查红圈位置。SVG 嵌入的 PNG 与原始 trace-workflow.png／trace-request.png／trace-lazy.png 逐字节一致，仅裁剪显示区域和叠加操作标记。
+- 检查确认第 07 节没有源码或命令片段，第 08 节不再包含参数归属表和生命周期正文；git diff --check 通过。运行实现和依赖未修改，未重跑 pytest、Gemini 或行情抓取。

@@ -7,6 +7,7 @@
 - `docs/images/adk-components.png` 来自 Google 的 [ADK Technical Overview](https://adk.dev/get-started/about/)，[原图](https://adk.dev/assets/adk-components.png)按原样保存，未修改。
 - 上游 [google/adk-docs](https://github.com/google/adk-docs) 采用 [Apache License 2.0](https://github.com/google/adk-docs/blob/main/LICENSE)，许可证副本见 [ADK-LICENSE.txt](docs/images/ADK-LICENSE.txt)。
 - `trace-workflow.png`、`trace-request.png`、`trace-lazy.png` 于 2026-10-30 从本机 ADK 2.13.0 Web UI 实际运行截取，使用 Gemini 3.8 Flash 和合成 DEMO 输入。分别展示顺序工作流与耗时、加载后的请求上下文、LAZY 发现步骤；未使用生成图片模拟界面。
+- `trace-workflow-guide.svg`、`trace-request-guide.svg`、`trace-lazy-guide.svg` 与 `trace-event-link-guide.svg` 嵌入上述原始 PNG，仅裁剪显示范围并叠加红圈、编号。原始截图像素完整保留，未改写界面或运行内容。
 - 截图中的框架界面来自 [google/adk-web](https://github.com/google/adk-web)，运行记录留在本机 `runs/`，不随仓库提交。
 
 ## Position Sizer · MIT
