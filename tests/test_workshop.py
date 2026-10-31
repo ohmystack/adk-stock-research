@@ -191,3 +191,16 @@ def test_real_runner_with_scripted_model(tmp_path,monkeypatch,entry,limit):
 def test_web_rejects_invalid_prompt_before_running(text):
     from stock_research.web import parse_prompt
     with pytest.raises(ValueError): parse_prompt(text)
+
+def test_model_cannot_unload_assigned_skills():
+    """Roles never need to unload; exposing unload_skill let a model loop load/unload until the step limit."""
+    import stock_research.runtime as rt
+    rt.environment()
+    _, toolsets, _, _ = rt.build_team(load_bundle("fixture","DEMO"), "eager")
+    async def names(ts):
+        try: return {t.name for t in await ts.get_tools_with_prefix(None)}
+        finally: await ts.close()
+    for role, ts in toolsets.items():
+        tools = asyncio.run(names(ts))
+        assert "load_skill" in tools, role
+        assert "unload_skill" not in tools, role
