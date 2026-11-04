@@ -156,3 +156,12 @@ Cloud Shell／Web Preview 仍未验证。所有截图均为合成输入；本轮
 ## 2026-10-31 · 前置阅读入口
 
 - 中文 README 在 English 下方、正文之前增加推荐前置阅读链接；链接文字为“Workshop: 用 ADK 玩转 Skill”，目标地址使用用户提供的飞书 URL。位置、Markdown 格式与 `git diff --check` 检查通过。
+
+## 2026-11-04 · RSS 新闻模板标题过滤
+
+- 基于最新 main（`a31197d`）检查 [issue #2](https://github.com/ohmystack/adk-stock-research/issues/2)。修复前运行 `tests/test_news.py::test_live_news_skips_placeholders_and_fills_five_slots`：**1 failed**，实际首条新闻为 `META_TITLE_QUOTE - Yahoo Finance`，空标题与其他模板标记也占用了新闻名额。
+- `load_bundle()` 在分配 N 编号之前跳过空标题和模板标记，继续收集最多五条有效新闻；有无发布者后缀的模板、带数字的模板与空白标题均被过滤。股票代码、含空格的大写新闻和含正常正文的下划线标题保留；原有七天时间窗口仍生效。
+- 缓存含无效标题时重新抓取并写回；正常缓存仍复用，`refresh=True` 仍强制更新。无有效新闻时保留缺失证据警告，不生成空新闻引用。
+- 定向回归 `.venv/bin/python -m pytest -q tests/test_news.py`：**12 passed，4 warnings**；全量回归 `.venv/bin/python -m pytest -q`：**41 passed，5 warnings，1.39 秒**。保留已有 pandas 弃用警告和 Skill 生命周期实验警告。
+- 新增测试固定纽约时间，以合成 OHLCV、本地 XML 和临时缓存执行真实 live 数据路径；未访问 Yahoo／Google News，未调用 Gemini，未消耗模型额度。
+- `git diff --check` 通过。修复采用针对明显模板标记的静态规则，不判断新闻正文真实性。

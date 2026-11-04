@@ -1,6 +1,7 @@
 from __future__ import annotations
 import hashlib
 import json
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -44,6 +45,12 @@ def indicators(rows: list[dict]) -> dict:
               "first_bar": df.date.iloc[0], "last_bar": df.date.iloc[-1], "count": len(df)}
     return {k: round(float(v), 6) if isinstance(v, (int, float)) or hasattr(v, "item") else v for k,v in result.items()}
 
+def _valid_news_title(title: str | None) -> bool:
+    # RSS appends " - Publisher" even to template tokens such as META_TITLE_QUOTE.
+    headline = (title or "").rsplit(" - ", 1)[0].strip()
+    # Require an underscore so ordinary ticker/acronym titles remain eligible.
+    return bool(headline) and not ("_" in headline and re.fullmatch(r"[A-Z0-9_]+", headline))
+
 def load_bundle(mode: str, ticker: str, refresh: bool = False) -> dict:
     if mode == "fixture":
         bundle = json.loads((ROOT / "data/fixtures/demo.json").read_text())
@@ -57,10 +64,12 @@ def load_bundle(mode: str, ticker: str, refresh: bool = False) -> dict:
         cache = ROOT / "data/cache" / f"{ticker}-{now.date()}.json"
         if cache.exists() and not refresh:
             cached = json.loads(cache.read_text())
-            cached["indicators"] = indicators(cached["prices"])
-            cached["target_week"] = target_week(cached["as_of"])
-            cached["sha256"] = hashlib.sha256(json.dumps(cached, sort_keys=True).encode()).hexdigest()
-            return cached
+            # Refill the news slots if an older cache contains invalid titles.
+            if all(_valid_news_title(item.get("title")) for item in cached["news"]):
+                cached["indicators"] = indicators(cached["prices"])
+                cached["target_week"] = target_week(cached["as_of"])
+                cached["sha256"] = hashlib.sha256(json.dumps(cached, sort_keys=True).encode()).hexdigest()
+                return cached
         hist = yf.Ticker(ticker).history(period="1y", auto_adjust=True)
         calendar = xc.get_calendar("XNYS")
         rows = []
@@ -82,9 +91,12 @@ def load_bundle(mode: str, ticker: str, refresh: bool = False) -> dict:
             with urlopen(Request(url,headers={"User-Agent":"ADK-Skills-Workshop/0.1"}), timeout=20) as response:
                 xml = ET.fromstring(response.read(500_000))
             for item in xml.findall("./channel/item"):
+                title = item.findtext("title")
+                if not _valid_news_title(title):
+                    continue
                 published = parsedate_to_datetime(item.findtext("pubDate", ""))
                 if now-timedelta(days=7) <= published <= now:
-                    news.append({"id":f"N{len(news)+1}", "title":item.findtext("title"), "url":item.findtext("link"), "published_at":published.isoformat(),"headline_only":True,"publisher":item.findtext("source")})
+                    news.append({"id":f"N{len(news)+1}", "title":title, "url":item.findtext("link"), "published_at":published.isoformat(),"headline_only":True,"publisher":item.findtext("source")})
                 if len(news) >= 5: break
         except Exception as exc:
             warnings.append(f"news unavailable: {type(exc).__name__}")
